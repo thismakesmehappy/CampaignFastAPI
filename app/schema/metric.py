@@ -1,10 +1,11 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
 
 class MetricCreate(BaseModel):
     """Request body for POST /campaigns/{id}/metrics. All fields required."""
-    impressions: int
-    clicks: int
-    spend: float
+    impressions: int = Field(..., ge=0)
+    clicks: int = Field(..., ge=0)
+    spend: float = Field(..., ge=0)
 
 
 class MetricUpdate(BaseModel):

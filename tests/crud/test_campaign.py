@@ -4,13 +4,15 @@ from pydantic import ValidationError
 
 from app.constants import PAGE_LIMIT_DEFAULT
 from app.crud import (
+    create_campaign,
     get_campaign,
     get_total_number_of_campaigns,
     update_campaign,
     delete_campaign,
 )
-from app.crud.campaign import create_campaign, list_campaigns
+from app.crud.campaign import list_campaigns
 from app.schema import CampaignCreate, PaginatedFilter, CampaignUpdate
+from tests.conftest import make_campaign_list, TEST_CAMPAIGN
 
 TEST_CAMPAIGNS = [
     CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
@@ -27,8 +29,6 @@ TEST_CAMPAIGNS = [
     CampaignCreate(name="Test Campaign Name 12", client="Test Campaign Client 12")
 ]
 
-TEST_CAMPAIGN = CampaignCreate(name="Test Campaign Name", client="Test Campaign Client")
-
 UPDATE_CAMPAIGN_NAME = "Update Campaign Name"
 UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
 LONG_STRING = "A" * 201
@@ -38,16 +38,8 @@ VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
 LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGNS), PAGE_LIMIT_DEFAULT)
 
 @pytest_asyncio.fixture
-async def existing_campaign(db_session):
-    return await create_campaign(db_session, TEST_CAMPAIGN)
-
-@pytest_asyncio.fixture
 async def existing_campaign_list(db_session):
-    campaigns = []
-    for test_campaign in TEST_CAMPAIGNS:
-        campaign = await create_campaign(db_session, test_campaign)
-        campaigns.append(campaign)
-    return campaigns
+    return await make_campaign_list(db_session, TEST_CAMPAIGNS)
 
 class TestCreateCampaign:
     async def test_create_campaign(self, db_session):
