@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 from typing import Generic, TypeVar
-from fastapi import Query
 
 from app.constants import PAGE_LIMIT_DEFAULT, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX
 
@@ -17,7 +16,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class PaginatedFilter:
-    """Query parameters for paginated list endpoints. Use as Depends(PaginatedFilter)."""
+    """Pagination parameters for CRUD list functions. Instantiate directly or via a router dependency."""
     def __init__(
         self,
         limit: int = PAGE_LIMIT_DEFAULT,
