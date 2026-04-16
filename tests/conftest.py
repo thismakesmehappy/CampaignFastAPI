@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
@@ -12,12 +12,14 @@ from app.schema import CampaignCreate, MetricCreate
 
 pg = create_postgres_fixture(Base, async_=True)
 
+
+
 """
 Build an async session from the pmr-managed engine.
 Each test gets its own session; the container is reused across the suite.
 """
 @pytest_asyncio.fixture
-async def db_session(pg) -> AsyncSession:
+async def db_session(pg) -> AsyncGenerator[AsyncSession, Any]:
     async with pg.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -44,7 +46,7 @@ Factory for parameterized metrics to be used in testt that required putting camp
 @pytest_asyncio.fixture
 def make_metric(db_session):
     async def _make(campaign_id, spend=0, clicks=0, impressions=0):
-        return await create_metric(db_session, campaign_id, MetricCreate(campaign_id=campaign_id, spend=spend, clicks=clicks, impressions=impressions))
+        return await create_metric(db_session, campaign_id, MetricCreate(spend=spend, clicks=clicks, impressions=impressions))
 
     return _make
 
