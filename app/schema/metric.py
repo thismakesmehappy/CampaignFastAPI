@@ -10,9 +10,9 @@ class MetricCreate(BaseModel):
 
 class MetricUpdate(BaseModel):
     """Request body for PATCH /metrics/{id}. All fields optional — only send what changed."""
-    impressions: int | None = None
-    clicks: int | None = None
-    spend: float | None = None
+    impressions: int | None = Field(None, ge=0)
+    clicks: int | None = Field(None, ge=0)
+    spend: float | None = Field(None, ge=0)
 
 
 class MetricRead(MetricCreate):

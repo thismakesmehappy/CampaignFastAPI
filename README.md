@@ -49,6 +49,15 @@ curl -s -X POST http://localhost:8000/campaigns/ \
 curl -s http://localhost:8000/campaigns/1 | jq
 ```
 
+## API client setup (Postman / Insomnia)
+
+FastAPI generates an OpenAPI spec automatically. With the stack running, import it into your API client:
+
+- **Postman:** File → Import → Link → `http://localhost:8000/openapi.json`
+- **Insomnia:** Application → Import → From URL → `http://localhost:8000/openapi.json`
+
+You can also browse the interactive docs at `http://localhost:8000/docs`.
+
 ## Running tests
 
 Docker must be running (pytest-mock-resources spins up a real Postgres container).

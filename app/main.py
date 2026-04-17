@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.routers import campaigns
+from app.routers import campaigns, metrics
 
 app = FastAPI(
     title="Campaign Tracker API",
@@ -9,3 +9,4 @@ app = FastAPI(
 )
 
 app.include_router(campaigns.router)
+app.include_router(metrics.router)

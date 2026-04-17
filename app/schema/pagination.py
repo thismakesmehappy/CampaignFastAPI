@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Generic, TypeVar
 
-from app.constants import PAGE_LIMIT_DEFAULT, PAGE_LIMIT_MIN, PAGE_LIMIT_MAX
+from app.constants import PAGE_LIMIT_DEFAULT
 
 T = TypeVar("T")
 

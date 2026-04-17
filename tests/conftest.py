@@ -18,6 +18,11 @@ UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
 VALID_CAMPAIGN_NAME = "Test Campaign Name"
 VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
 
+TEST_METRIC = MetricCreate(spend=100.0, clicks=50, impressions=1000)
+UPDATE_METRIC_SPEND = 200.0
+UPDATE_METRIC_CLICKS = 75
+UPDATE_METRIC_IMPRESSIONS = 2000
+
 pg = create_postgres_fixture(Base, async_=True)
 
 @pytest_asyncio.fixture
@@ -61,6 +66,33 @@ TEST_CAMPAIGN = CampaignCreate(name="Test Campaign Name", client="Test Campaign 
 @pytest_asyncio.fixture
 async def existing_campaign(db_session):
     return await create_campaign(db_session, TEST_CAMPAIGN)
+
+
+@pytest_asyncio.fixture
+async def existing_metric(db_session, existing_campaign):
+    return await create_metric(db_session, existing_campaign.id, TEST_METRIC)
+
+
+TEST_METRIC_LIST = [
+    MetricCreate(spend=float(i * 10), clicks=i * 5, impressions=i * 100)
+    for i in range(1, 13)
+]
+
+
+async def make_metric_list(db_session: AsyncSession, campaign_id: int, metrics_to_build: list[MetricCreate]) -> list[Any]:
+    metrics = []
+    for metric_data in metrics_to_build:
+        metric = await create_metric(db_session, campaign_id, metric_data)
+        metrics.append(metric)
+    return metrics
+
+
+@pytest_asyncio.fixture
+async def existing_metric_list(db_session, existing_campaign):
+    return await make_metric_list(db_session, existing_campaign.id, TEST_METRIC_LIST)
+
+
+LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS = min(len(TEST_METRIC_LIST), PAGE_LIMIT_DEFAULT)
 
 TEST_CAMPAIGN_LIST = [
     CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),

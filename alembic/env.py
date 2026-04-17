@@ -3,12 +3,12 @@ import os
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from sqlalchemy.ext.asyncio import create_async_engine
-
-from alembic import context
-from app.models import Base
+from sqlalchemy.ext.asyncio import create_async_engine  # noqa: E402
+from alembic import context  # noqa: E402
+from app.models import Base  # noqa: E402
 
 config = context.config
 fileConfig(config.config_file_name)
