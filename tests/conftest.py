@@ -4,22 +4,25 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from pytest_mock_resources import create_postgres_fixture
 
+from app.constants import PAGE_LIMIT_DEFAULT
 from app.crud.metric import create_metric
 from app.models.base import Base
 
 from app.crud.campaign import create_campaign
 from app.schema import CampaignCreate, MetricCreate
 
+LONG_STRING = "A" * 201
+
+UPDATE_CAMPAIGN_NAME = "Update Campaign Name"
+UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
+VALID_CAMPAIGN_NAME = "Test Campaign Name"
+VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
+
 pg = create_postgres_fixture(Base, async_=True)
 
-
-
-"""
-Build an async session from the pmr-managed engine.
-Each test gets its own session; the container is reused across the suite.
-"""
 @pytest_asyncio.fixture
 async def db_session(pg) -> AsyncGenerator[AsyncSession, Any]:
+    """Build an async session from the pmr-managed engine. Each test gets its own isolated schema."""
     async with pg.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
@@ -30,21 +33,17 @@ async def db_session(pg) -> AsyncGenerator[AsyncSession, Any]:
     async with pg.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-'''
-Factory for parameterized campaigns to be used in testt that required putting campaigns in the database
-'''
 @pytest_asyncio.fixture
 def make_campaign(db_session):
+    """Factory fixture for creating campaigns with custom fields."""
     async def _make(name="Test Campaign", client="Acme"):
         return await create_campaign(db_session, CampaignCreate(name=name, client=client))
 
     return _make
 
-'''
-Factory for parameterized metrics to be used in testt that required putting campaigns in the database
-'''
 @pytest_asyncio.fixture
 def make_metric(db_session):
+    """Factory fixture for creating metrics with custom fields."""
     async def _make(campaign_id, spend=0, clicks=0, impressions=0):
         return await create_metric(db_session, campaign_id, MetricCreate(spend=spend, clicks=clicks, impressions=impressions))
 
@@ -62,3 +61,24 @@ TEST_CAMPAIGN = CampaignCreate(name="Test Campaign Name", client="Test Campaign 
 @pytest_asyncio.fixture
 async def existing_campaign(db_session):
     return await create_campaign(db_session, TEST_CAMPAIGN)
+
+TEST_CAMPAIGN_LIST = [
+    CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
+    CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
+    CampaignCreate(name="Test Campaign Name 3", client="Test Campaign Client 3"),
+    CampaignCreate(name="Test Campaign Name 4", client="Test Campaign Client 4"),
+    CampaignCreate(name="Test Campaign Name 5", client="Test Campaign Client 5"),
+    CampaignCreate(name="Test Campaign Name 6", client="Test Campaign Client 6"),
+    CampaignCreate(name="Test Campaign Name 7", client="Test Campaign Client 7"),
+    CampaignCreate(name="Test Campaign Name 8", client="Test Campaign Client 8"),
+    CampaignCreate(name="Test Campaign Name 9", client="Test Campaign Client 9"),
+    CampaignCreate(name="Test Campaign Name 10", client="Test Campaign Client 10"),
+    CampaignCreate(name="Test Campaign Name 11", client="Test Campaign Client 11"),
+    CampaignCreate(name="Test Campaign Name 12", client="Test Campaign Client 12")
+]
+
+@pytest_asyncio.fixture
+async def existing_campaign_list(db_session):
+    return await make_campaign_list(db_session, TEST_CAMPAIGN_LIST)
+
+LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGN_LIST), PAGE_LIMIT_DEFAULT)

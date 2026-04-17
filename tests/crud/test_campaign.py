@@ -1,8 +1,6 @@
 import pytest
-import pytest_asyncio
 from pydantic import ValidationError
 
-from app.constants import PAGE_LIMIT_DEFAULT
 from app.crud import (
     create_campaign,
     get_campaign,
@@ -12,34 +10,17 @@ from app.crud import (
 )
 from app.crud.campaign import list_campaigns
 from app.schema import CampaignCreate, PaginatedFilter, CampaignUpdate
-from tests.conftest import make_campaign_list, TEST_CAMPAIGN
-
-TEST_CAMPAIGNS = [
-    CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
-    CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
-    CampaignCreate(name="Test Campaign Name 3", client="Test Campaign Client 3"),
-    CampaignCreate(name="Test Campaign Name 4", client="Test Campaign Client 4"),
-    CampaignCreate(name="Test Campaign Name 5", client="Test Campaign Client 5"),
-    CampaignCreate(name="Test Campaign Name 6", client="Test Campaign Client 6"),
-    CampaignCreate(name="Test Campaign Name 7", client="Test Campaign Client 7"),
-    CampaignCreate(name="Test Campaign Name 8", client="Test Campaign Client 8"),
-    CampaignCreate(name="Test Campaign Name 9", client="Test Campaign Client 9"),
-    CampaignCreate(name="Test Campaign Name 10", client="Test Campaign Client 10"),
-    CampaignCreate(name="Test Campaign Name 11", client="Test Campaign Client 11"),
-    CampaignCreate(name="Test Campaign Name 12", client="Test Campaign Client 12")
-]
-
-UPDATE_CAMPAIGN_NAME = "Update Campaign Name"
-UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
-LONG_STRING = "A" * 201
-VALID_CAMPAIGN_NAME = "Test Campaign Name"
-VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
-
-LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGNS), PAGE_LIMIT_DEFAULT)
-
-@pytest_asyncio.fixture
-async def existing_campaign_list(db_session):
-    return await make_campaign_list(db_session, TEST_CAMPAIGNS)
+from tests.conftest import (
+    TEST_CAMPAIGN,
+    TEST_CAMPAIGN_LIST,
+    LONG_STRING,
+    VALID_CAMPAIGN_CLIENT,
+    VALID_CAMPAIGN_NAME,
+    UPDATE_CAMPAIGN_CLIENT,
+    UPDATE_CAMPAIGN_NAME,
+    LENGTH_OF_RESULTS_DEFAULT_FILTERS,
+)
+from tests.helpers.campaign import compare_campaign_list_equality
 
 class TestCreateCampaign:
     async def test_create_campaign(self, db_session):
@@ -82,9 +63,7 @@ class TestListCampaigns:
     async def test_list_campaigns_no_filters(self, db_session, existing_campaign_list):
         campaign_list = await list_campaigns(db_session)
         assert len(campaign_list) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
-        for index in range(LENGTH_OF_RESULTS_DEFAULT_FILTERS):
-            assert campaign_list[index].name == TEST_CAMPAIGNS[index].name
-            assert campaign_list[index].client == TEST_CAMPAIGNS[index].client
+        compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST)
     
     async def test_list_campaigns_filter_limit_is_less_than_total_items(self, db_session, existing_campaign_list):
         limit = 4
@@ -92,19 +71,15 @@ class TestListCampaigns:
         campaign_list = await list_campaigns(db_session, filter_limit)
         assert campaign_list
         assert len(campaign_list) == limit
-        for index in range(limit):
-            assert campaign_list[index].name == TEST_CAMPAIGNS[index].name
-            assert campaign_list[index].client == TEST_CAMPAIGNS[index].client
+        compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST)
 
     async def test_list_campaigns_filter_limit_is_greater_than_total_items(self, db_session, existing_campaign_list):
-        limit = len(TEST_CAMPAIGNS) * 2
+        limit = len(TEST_CAMPAIGN_LIST) * 2
         filter_limit = PaginatedFilter(limit=limit)
         campaign_list = await list_campaigns(db_session, filter_limit)
         assert campaign_list
-        assert len(campaign_list) == len(TEST_CAMPAIGNS)
-        for index in range(len(TEST_CAMPAIGNS)):
-            assert campaign_list[index].name == TEST_CAMPAIGNS[index].name
-            assert campaign_list[index].client == TEST_CAMPAIGNS[index].client
+        assert len(campaign_list) == len(TEST_CAMPAIGN_LIST)
+        compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST)
 
     async def test_list_campaigns_filter_offset_result_contains_default_number_of_items(self, db_session, existing_campaign_list):
         offset = 1
@@ -112,23 +87,19 @@ class TestListCampaigns:
         campaign_list = await list_campaigns(db_session, filter_limit)
         assert campaign_list
         assert len(campaign_list) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
-        for index in range(len(campaign_list)):
-            assert campaign_list[index].name == TEST_CAMPAIGNS[index + offset].name
-            assert campaign_list[index].client == TEST_CAMPAIGNS[index + offset].client
+        compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST, offset)
 
     async def test_list_campaigns_filter_offset_result_contains_fewer_items(self, db_session, existing_campaign_list):
         expected_results_size = 2
-        offset = len(TEST_CAMPAIGNS) - expected_results_size
+        offset = len(TEST_CAMPAIGN_LIST) - expected_results_size
         filter_limit = PaginatedFilter(offset=offset)
         campaign_list = await list_campaigns(db_session, filter_limit)
         assert campaign_list
         assert len(campaign_list) == expected_results_size
-        for index in range(expected_results_size):
-            assert campaign_list[index].name == TEST_CAMPAIGNS[index + offset].name
-            assert campaign_list[index].client == TEST_CAMPAIGNS[index + offset].client
+        compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST, offset)
 
     async def test_list_campaigns_filter_offset_past_number_of_entries(self, db_session, existing_campaign_list):
-        offset = len(TEST_CAMPAIGNS)
+        offset = len(TEST_CAMPAIGN_LIST)
         filter_limit = PaginatedFilter(offset=offset)
         campaign_list = await list_campaigns(db_session, filter_limit)
         assert isinstance(campaign_list, list)
