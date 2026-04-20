@@ -2,10 +2,14 @@ from app.constants import PAGE_LIMIT_DEFAULT
 from tests.conftest import (
     TEST_METRIC,
     TEST_METRIC_LIST,
+    TEST_METRICS_MULTI,
     UPDATE_METRIC_SPEND,
     UPDATE_METRIC_CLICKS,
     UPDATE_METRIC_IMPRESSIONS,
     LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS,
+    SUMMARY_TOTAL_CLICKS,
+    SUMMARY_TOTAL_SPEND,
+    SUMMARY_TOTAL_IMPRESSIONS,
 )
 
 
@@ -296,3 +300,65 @@ class TestDeleteMetric:
         await client.delete(f"/metrics/{existing_metric.id}/")
         response = await client.get(f"/metrics/{existing_metric.id}/")
         assert response.status_code == 404
+
+
+class TestGetMetricsSummaryForCampaign:
+    async def test_summary_for_campaign(self, client, existing_metrics_single_campaign, existing_campaign):
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/summary/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["clicks"] == SUMMARY_TOTAL_CLICKS
+        assert data["spend"] == SUMMARY_TOTAL_SPEND
+        assert data["impressions"] == SUMMARY_TOTAL_IMPRESSIONS
+        assert data["total_metrics"] == len(TEST_METRICS_MULTI)
+        assert data["campaign_id"] == existing_campaign.id
+
+    async def test_summary_for_campaign_no_entries(self, client, existing_campaign):
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/summary/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["clicks"] == 0
+        assert data["spend"] == 0
+        assert data["impressions"] == 0
+        assert data["total_metrics"] == 0
+        assert data["campaign_id"] == existing_campaign.id
+
+    async def test_summary_for_campaign_not_found(self, client, existing_campaign):
+        fake_id = existing_campaign.id + 1
+        response = await client.get(f"/campaigns/{fake_id}/metrics/summary/")
+        assert response.status_code == 404
+
+    async def test_summary_for_campaign_only_shows_own_metrics(self, client, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
+        metrics = existing_metrics_across_campaigns["metrics"]
+        target_id = campaign_ids[0]
+        response = await client.get(f"/campaigns/{target_id}/metrics/summary/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["clicks"] == metrics[0].clicks
+        assert data["spend"] == metrics[0].spend
+        assert data["impressions"] == metrics[0].impressions
+        assert data["total_metrics"] == 1
+        assert data["campaign_id"] == target_id
+
+
+class TestGetMetricsSummary:
+    async def test_summary(self, client, existing_metrics_across_campaigns):
+        response = await client.get("/metrics/summary/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["clicks"] == SUMMARY_TOTAL_CLICKS
+        assert data["spend"] == SUMMARY_TOTAL_SPEND
+        assert data["impressions"] == SUMMARY_TOTAL_IMPRESSIONS
+        assert data["total_metrics"] == len(TEST_METRICS_MULTI)
+        assert data["campaign_id"] is None
+
+    async def test_summary_no_entries(self, client):
+        response = await client.get("/metrics/summary/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["clicks"] == 0
+        assert data["spend"] == 0
+        assert data["impressions"] == 0
+        assert data["total_metrics"] == 0
+        assert data["campaign_id"] is None

@@ -112,6 +112,12 @@ SUMMARY_TOTAL_IMPRESSIONS = sum(m.impressions for m in TEST_METRICS_MULTI)
 
 
 @pytest_asyncio.fixture
+async def existing_metrics_single_campaign(db_session, make_metric, existing_campaign):
+    """Multiple metrics for a single campaign. Use to test aggregation (e.g. summary SUM)."""
+    for metric in TEST_METRICS_MULTI:
+        await make_metric(existing_campaign.id, spend=metric.spend, clicks=metric.clicks, impressions=metric.impressions)
+
+@pytest_asyncio.fixture
 async def existing_metrics_across_campaigns(db_session):
     """One metric per campaign across multiple campaigns. Use to test campaign-scoped filtering."""
     campaigns = await make_campaign_list(db_session, TEST_CAMPAIGNS_MULTI)

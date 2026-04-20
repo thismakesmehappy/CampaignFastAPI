@@ -19,3 +19,7 @@ class MetricRead(MetricBase):
     id: int
     campaign_id: int
     model_config = {"from_attributes": True}
+
+class MetricSummary(MetricBase):
+    total_metrics: int = Field(..., ge=0)
+    campaign_id: int | None = Field(None)

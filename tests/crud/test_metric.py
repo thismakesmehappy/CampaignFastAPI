@@ -28,13 +28,9 @@ UPDATE_METRIC_IMPRESSIONS = 400
 
 @pytest_asyncio.fixture
 async def existing_metric(db_session, make_metric, make_campaign):
-    campaign = await make_campaign(db_session, TEST_CAMPAIGN)
-    return await make_metric(db_session, campaign.id, TEST_METRIC)
+    campaign = await make_campaign(name=TEST_CAMPAIGN.name, client=TEST_CAMPAIGN.client)
+    return await make_metric(campaign.id, spend=TEST_METRIC.spend, clicks=TEST_METRIC.clicks, impressions=TEST_METRIC.impressions)
 
-@pytest_asyncio.fixture
-async def existing_metrics_single_campaign(db_session, make_metric, existing_campaign):
-    for metric in TEST_METRICS_MULTI:
-        await make_metric(existing_campaign.id, spend=metric.spend, impressions=metric.impressions, clicks=metric.clicks)
 
 class TestCreateMetric:
     async def test_create_metric(self, db_session, existing_metric):
