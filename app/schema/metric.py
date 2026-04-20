@@ -1,12 +1,11 @@
 from pydantic import BaseModel, Field
 
 
-class MetricCreate(BaseModel):
-    """Request body for POST /campaigns/{id}/metrics. All fields required."""
+class MetricBase(BaseModel):
+    """Basic data for metric endpoints"""
     impressions: int = Field(..., ge=0)
     clicks: int = Field(..., ge=0)
     spend: float = Field(..., ge=0)
-
 
 class MetricUpdate(BaseModel):
     """Request body for PATCH /metrics/{id}. All fields optional — only send what changed."""
@@ -15,7 +14,7 @@ class MetricUpdate(BaseModel):
     spend: float | None = Field(None, ge=0)
 
 
-class MetricRead(MetricCreate):
+class MetricRead(MetricBase):
     """Response body for any endpoint returning a single metric. Deserializes from ORM via from_attributes."""
     id: int
     campaign_id: int

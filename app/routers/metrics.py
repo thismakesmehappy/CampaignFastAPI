@@ -5,10 +5,10 @@ from app import crud
 from app.database import get_db
 from app.schema import (
     MetricRead,
-    MetricCreate,
+    MetricBase,
+    MetricUpdate,
     PaginatedFilter,
     PaginatedResponse,
-    MetricUpdate,
 )
 
 from app.schema.error import ErrorResponse
@@ -19,7 +19,7 @@ router = APIRouter(tags=["metrics"])
 _404 = {404: {"model": ErrorResponse}}
 
 @router.post("/campaigns/{campaign_id}/metrics/", response_model=MetricRead, status_code=201, responses=_404)
-async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db)):
+async def create_metric(campaign_id: int, data: MetricBase, db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")

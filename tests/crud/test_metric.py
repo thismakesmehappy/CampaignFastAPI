@@ -1,7 +1,6 @@
 import pytest
 import pytest_asyncio
 
-from app.crud import create_campaign
 from app.crud.metric import (
     create_metric,
     get_metric,
@@ -9,21 +8,33 @@ from app.crud.metric import (
     get_total_number_of_metrics,
     update_metric,
     delete_metric,
+    get_metrics_summary,
 )
-from app.schema import MetricCreate, PaginatedFilter, MetricUpdate
-from tests.conftest import TEST_CAMPAIGN, TEST_METRICS_MULTI as TEST_METRICS
+from app.schema import MetricBase, MetricUpdate, PaginatedFilter
+from tests.conftest import (
+    TEST_CAMPAIGN,
+    TEST_METRICS_MULTI as TEST_METRICS,
+    TEST_METRICS_MULTI,
+    SUMMARY_TOTAL_CLICKS,
+    SUMMARY_TOTAL_SPEND,
+    SUMMARY_TOTAL_IMPRESSIONS,
+)
 
-TEST_METRIC = MetricCreate(spend=1, clicks=2, impressions=3)
+TEST_METRIC = MetricBase(spend=1, clicks=2, impressions=3)
 
 UPDATE_METRIC_SPEND = 200
 UPDATE_METRIC_CLICKS = 100
 UPDATE_METRIC_IMPRESSIONS = 400
 
+@pytest_asyncio.fixture
+async def existing_metric(db_session, make_metric, make_campaign):
+    campaign = await make_campaign(db_session, TEST_CAMPAIGN)
+    return await make_metric(db_session, campaign.id, TEST_METRIC)
 
 @pytest_asyncio.fixture
-async def existing_metric(db_session):
-    campaign = await create_campaign(db_session, TEST_CAMPAIGN)
-    return await create_metric(db_session, campaign.id, TEST_METRIC)
+async def existing_metrics_single_campaign(db_session, make_metric, existing_campaign):
+    for metric in TEST_METRICS_MULTI:
+        await make_metric(existing_campaign.id, spend=metric.spend, impressions=metric.impressions, clicks=metric.clicks)
 
 class TestCreateMetric:
     async def test_create_metric(self, db_session, existing_metric):
@@ -40,32 +51,32 @@ class TestCreateMetric:
     async def test_create_metric_no_spend(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(clicks=0, impressions=0))
+            await create_metric(db_session, campaign_id, MetricBase(clicks=0, impressions=0))
 
     async def test_create_metric_no_clicks(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(spend=0, impressions=0))
+            await create_metric(db_session, campaign_id, MetricBase(spend=0, impressions=0))
 
     async def test_create_metric_no_impressions(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(clicks=0, spend=0))
+            await create_metric(db_session, campaign_id, MetricBase(clicks=0, spend=0))
 
     async def test_create_metric_negative_spend(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(spend=-1, clicks=0, impressions=0))
+            await create_metric(db_session, campaign_id, MetricBase(spend=-1, clicks=0, impressions=0))
 
     async def test_create_metric_negative_clicks(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(spend=0, clicks=-1, impressions=0))
+            await create_metric(db_session, campaign_id, MetricBase(spend=0, clicks=-1, impressions=0))
 
     async def test_create_metric_negative_impressions(self, db_session, existing_metric):
         campaign_id = existing_metric.campaign_id
         with pytest.raises(ValueError):
-            await create_metric(db_session, campaign_id, MetricCreate(spend=0, clicks=0, impressions=-1))
+            await create_metric(db_session, campaign_id, MetricBase(spend=0, clicks=0, impressions=-1))
 
 class TestGetMetric:
     async def test_get_metric(self, db_session, existing_metric):
@@ -138,6 +149,46 @@ class TestGetTotalNumberOfMetrics:
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         number_of_metrics = await get_total_number_of_metrics(db_session, campaign_ids[0])
         assert number_of_metrics == 1
+
+class TestMetricsSummary:
+    async def test_summary(self, db_session, existing_metrics_across_campaigns):
+        summary = await get_metrics_summary(db_session)
+        assert summary
+        assert summary.clicks == SUMMARY_TOTAL_CLICKS
+        assert summary.spend == SUMMARY_TOTAL_SPEND
+        assert summary.impressions == SUMMARY_TOTAL_IMPRESSIONS
+        
+    async def test_summary_no_entries(self, db_session):
+        summary = await get_metrics_summary(db_session)
+        assert summary
+        assert summary.clicks == 0
+        assert summary.spend == 0
+        assert summary.impressions == 0
+        
+    async def test_summary_for_campaign(self, db_session, existing_metrics_single_campaign, existing_campaign):
+        campaign_id = existing_campaign.id
+        summary = await get_metrics_summary(db_session, campaign_id)
+        assert summary
+        assert summary.clicks == SUMMARY_TOTAL_CLICKS
+        assert summary.spend == SUMMARY_TOTAL_SPEND
+        assert summary.impressions == SUMMARY_TOTAL_IMPRESSIONS
+    
+    async def test_summary_for_campaign_no_entries(self, db_session, existing_campaign):
+        campaign_id = existing_campaign.id
+        summary = await get_metrics_summary(db_session, campaign_id)
+        assert summary
+        assert summary.clicks == 0
+        assert summary.spend == 0
+        assert summary.impressions == 0
+
+    async def test_summary_for_campaign_only_shows_campaigns_results(self, db_session, existing_metrics_across_campaigns):
+        metric = existing_metrics_across_campaigns['metrics'][0]
+        campaign_id = metric.campaign_id
+        summary = await get_metrics_summary(db_session, campaign_id)
+        assert summary
+        assert summary.clicks == metric.clicks
+        assert summary.spend == metric.spend
+        assert summary.impressions == metric.impressions
 
 class TestUpdateCampaign:
     async def test_update_metric_with_all_fields(self, db_session, existing_metric):

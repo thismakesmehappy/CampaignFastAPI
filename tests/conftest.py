@@ -9,7 +9,7 @@ from app.crud.metric import create_metric
 from app.models.base import Base
 
 from app.crud.campaign import create_campaign
-from app.schema import CampaignCreate, MetricCreate
+from app.schema import CampaignCreate, MetricBase
 
 LONG_STRING = "A" * 201
 
@@ -18,7 +18,7 @@ UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
 VALID_CAMPAIGN_NAME = "Test Campaign Name"
 VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
 
-TEST_METRIC = MetricCreate(spend=100.0, clicks=50, impressions=1000)
+TEST_METRIC = MetricBase(spend=100.0, clicks=50, impressions=1000)
 UPDATE_METRIC_SPEND = 200.0
 UPDATE_METRIC_CLICKS = 75
 UPDATE_METRIC_IMPRESSIONS = 2000
@@ -50,7 +50,7 @@ def make_campaign(db_session):
 def make_metric(db_session):
     """Factory fixture for creating metrics with custom fields."""
     async def _make(campaign_id, spend=0, clicks=0, impressions=0):
-        return await create_metric(db_session, campaign_id, MetricCreate(spend=spend, clicks=clicks, impressions=impressions))
+        return await create_metric(db_session, campaign_id, MetricBase(spend=spend, clicks=clicks, impressions=impressions))
 
     return _make
 
@@ -74,12 +74,12 @@ async def existing_metric(db_session, existing_campaign):
 
 
 TEST_METRIC_LIST = [
-    MetricCreate(spend=float(i * 10), clicks=i * 5, impressions=i * 100)
+    MetricBase(spend=float(i * 10), clicks=i * 5, impressions=i * 100)
     for i in range(1, 13)
 ]
 
 
-async def make_metric_list(db_session: AsyncSession, campaign_id: int, metrics_to_build: list[MetricCreate]) -> list[Any]:
+async def make_metric_list(db_session: AsyncSession, campaign_id: int, metrics_to_build: list[MetricBase]) -> list[Any]:
     metrics = []
     for metric_data in metrics_to_build:
         metric = await create_metric(db_session, campaign_id, metric_data)
@@ -101,10 +101,14 @@ TEST_CAMPAIGNS_MULTI = [
 ]
 
 TEST_METRICS_MULTI = [
-    MetricCreate(spend=1, clicks=1, impressions=1),
-    MetricCreate(spend=2, clicks=2, impressions=2),
-    MetricCreate(spend=3, clicks=3, impressions=3),
+    MetricBase(spend=1.1, clicks=1, impressions=10),
+    MetricBase(spend=2.2, clicks=2, impressions=20),
+    MetricBase(spend=3.3, clicks=3, impressions=30),
 ]
+
+SUMMARY_TOTAL_SPEND = sum(m.spend for m in TEST_METRICS_MULTI)
+SUMMARY_TOTAL_CLICKS = sum(m.clicks for m in TEST_METRICS_MULTI)
+SUMMARY_TOTAL_IMPRESSIONS = sum(m.impressions for m in TEST_METRICS_MULTI)
 
 
 @pytest_asyncio.fixture

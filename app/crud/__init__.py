@@ -13,6 +13,7 @@ from app.crud.metric import (
     get_total_number_of_metrics,
     update_metric,
     delete_metric,
+    get_metrics_summary
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "get_total_number_of_metrics",
     "update_metric",
     "delete_metric",
+    "get_metrics_summary"
 ]
