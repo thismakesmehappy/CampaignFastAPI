@@ -81,6 +81,55 @@ class TestCreateMetric:
         assert response.status_code == 201
 
 
+class TestListMetricsForCampaign:
+    async def test_list_metrics_for_campaign(self, client, existing_metric_list, existing_campaign):
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["offset"] == 0
+        assert data["limit"] == PAGE_LIMIT_DEFAULT
+        items = data["items"]
+        assert len(items) == LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS
+        assert all(item["campaign_id"] == existing_campaign.id for item in items)
+
+    async def test_list_metrics_for_campaign_not_found(self, client, existing_campaign):
+        fake_id = existing_campaign.id + 1
+        response = await client.get(f"/campaigns/{fake_id}/metrics/")
+        assert response.status_code == 404
+
+    async def test_list_metrics_for_campaign_no_entries(self, client, existing_campaign):
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/")
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["items"]) == 0
+        assert data["total"] == 0
+
+    async def test_list_metrics_for_campaign_limit(self, client, existing_metric_list, existing_campaign):
+        limit = 4
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/?limit={limit}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["limit"] == limit
+        assert len(data["items"]) == limit
+
+    async def test_list_metrics_for_campaign_offset(self, client, existing_metric_list, existing_campaign):
+        offset = 1
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/?offset={offset}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["offset"] == offset
+        assert len(data["items"]) == LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS
+
+    async def test_list_metrics_for_campaign_only_returns_own_metrics(self, client, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
+        target_id = campaign_ids[0]
+        response = await client.get(f"/campaigns/{target_id}/metrics/")
+        assert response.status_code == 200
+        items = response.json()["items"]
+        assert len(items) == 1
+        assert all(item["campaign_id"] == target_id for item in items)
+
+
 class TestGetMetric:
     async def test_get_metric(self, client, existing_metric):
         response = await client.get(f"/metrics/{existing_metric.id}/")

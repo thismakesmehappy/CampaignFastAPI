@@ -25,6 +25,23 @@ async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession =
         raise HTTPException(status_code=404, detail="Campaign not found")
     return await crud.create_metric(db, campaign_id, data)
 
+@router.get("/campaigns/{campaign_id}/metrics/", response_model=PaginatedResponse[MetricRead], status_code=200, responses=_404)
+async def list_metrics_for_campaign(campaign_id: int, pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db)):
+    campaign = await crud.get_campaign(db, campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    metrics_list = await crud.list_metrics(db, pagination, campaign_id)
+    total = await crud.get_total_number_of_metrics(db, campaign_id)
+    has_more = pagination.offset + len(metrics_list) < total
+    response = PaginatedResponse(
+        items=metrics_list,
+        has_more=has_more,
+        total=total,
+        offset=pagination.offset,
+        limit=pagination.limit,
+    )
+    return response
+
 @router.get("/metrics/", response_model=PaginatedResponse[MetricRead], status_code=200)
 async def list_metrics(pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db)):
     metrics_list = await crud.list_metrics(db, pagination)

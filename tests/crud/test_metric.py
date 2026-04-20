@@ -10,22 +10,10 @@ from app.crud.metric import (
     update_metric,
     delete_metric,
 )
-from app.schema import CampaignCreate, MetricCreate, PaginatedFilter, MetricUpdate
-from tests.conftest import make_campaign_list, TEST_CAMPAIGN
-
-TEST_CAMPAIGNS = [
-    CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
-    CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
-    CampaignCreate(name="Test Campaign Name 3", client="Test Campaign Client 3"),
-]
+from app.schema import MetricCreate, PaginatedFilter, MetricUpdate
+from tests.conftest import TEST_CAMPAIGN, TEST_METRICS_MULTI as TEST_METRICS
 
 TEST_METRIC = MetricCreate(spend=1, clicks=2, impressions=3)
-
-TEST_METRICS = [
-    MetricCreate(spend=1, clicks=1, impressions=1),
-    MetricCreate(spend=2, clicks=2, impressions=2),
-    MetricCreate(spend=3, clicks=3, impressions=3),
-]
 
 UPDATE_METRIC_SPEND = 200
 UPDATE_METRIC_CLICKS = 100
@@ -33,21 +21,9 @@ UPDATE_METRIC_IMPRESSIONS = 400
 
 
 @pytest_asyncio.fixture
-async def existing_metric_list(db_session):
-    campaigns = await make_campaign_list(db_session, TEST_CAMPAIGNS)
-    campaign_ids = [campaign.id for campaign in campaigns]
-    metrics = []
-    for index in range(len(TEST_METRICS)):
-        metric = await create_metric(db_session, campaign_ids[index], TEST_METRICS[index])
-        metrics.append(metric)
-    return {"metrics": metrics, "campaign_ids": campaign_ids}
-        
-
-@pytest_asyncio.fixture
 async def existing_metric(db_session):
     campaign = await create_campaign(db_session, TEST_CAMPAIGN)
-    campaign_id = campaign.id
-    return await create_metric(db_session, campaign_id, TEST_METRIC)
+    return await create_metric(db_session, campaign.id, TEST_METRIC)
 
 class TestCreateMetric:
     async def test_create_metric(self, db_session, existing_metric):
@@ -106,7 +82,7 @@ class TestGetMetric:
         assert metric is None
         
 class TestListMetrics:
-    async def test_list_metrics(self, db_session, existing_metric_list):
+    async def test_list_metrics(self, db_session, existing_metrics_across_campaigns):
         metric_list = await list_metrics(db_session)
         assert len(metric_list) == len(TEST_METRICS)
         for index in range(len(metric_list)):
@@ -114,7 +90,7 @@ class TestListMetrics:
             assert metric_list[index].spend == TEST_METRICS[index].spend
             assert metric_list[index].impressions == TEST_METRICS[index].impressions
             
-    async def test_list_metrics_with_offset(self, db_session, existing_metric_list):
+    async def test_list_metrics_with_offset(self, db_session, existing_metrics_across_campaigns):
         offset = 1
         filter_offset = PaginatedFilter(offset=offset)
         metric_list = await list_metrics(db_session, filter_offset)
@@ -124,7 +100,7 @@ class TestListMetrics:
             assert metric_list[index].spend == TEST_METRICS[index + offset].spend
             assert metric_list[index].impressions == TEST_METRICS[index + offset].impressions
 
-    async def test_list_metrics_with_limit(self, db_session, existing_metric_list):
+    async def test_list_metrics_with_limit(self, db_session, existing_metrics_across_campaigns):
         limit = 2
         filter_offset = PaginatedFilter(limit=limit)
         metric_list = await list_metrics(db_session, filter_offset)
@@ -134,8 +110,8 @@ class TestListMetrics:
             assert metric_list[index].spend == TEST_METRICS[index].spend
             assert metric_list[index].impressions == TEST_METRICS[index].impressions
 
-    async def test_list_metrics_with_campaign_id(self, db_session, existing_metric_list):
-        campaign_ids = existing_metric_list['campaign_ids']
+    async def test_list_metrics_with_campaign_id(self, db_session, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns['campaign_ids']
         position = 1
         campaign_id = campaign_ids[position]
 
@@ -150,16 +126,16 @@ class TestListMetrics:
         assert len(metric_list) == 0
         
 class TestGetTotalNumberOfMetrics:
-    async def test_get_total_number_of_metrics_with_entries(self, db_session, existing_metric_list):
+    async def test_get_total_number_of_metrics_with_entries(self, db_session, existing_metrics_across_campaigns):
         number_of_metrics = await get_total_number_of_metrics(db_session)
-        assert number_of_metrics == len(existing_metric_list["metrics"])
+        assert number_of_metrics == len(existing_metrics_across_campaigns["metrics"])
 
     async def test_get_total_number_of_metrics_no_entries(self, db_session):
         number_of_metrics = await get_total_number_of_metrics(db_session)
         assert number_of_metrics == 0
 
-    async def test_get_total_number_of_metrics_filtered_by_campaign(self, db_session, existing_metric_list):
-        campaign_ids = existing_metric_list["campaign_ids"]
+    async def test_get_total_number_of_metrics_filtered_by_campaign(self, db_session, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         number_of_metrics = await get_total_number_of_metrics(db_session, campaign_ids[0])
         assert number_of_metrics == 1
 

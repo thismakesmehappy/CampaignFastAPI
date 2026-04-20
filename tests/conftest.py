@@ -94,6 +94,30 @@ async def existing_metric_list(db_session, existing_campaign):
 
 LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS = min(len(TEST_METRIC_LIST), PAGE_LIMIT_DEFAULT)
 
+TEST_CAMPAIGNS_MULTI = [
+    CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
+    CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
+    CampaignCreate(name="Test Campaign Name 3", client="Test Campaign Client 3"),
+]
+
+TEST_METRICS_MULTI = [
+    MetricCreate(spend=1, clicks=1, impressions=1),
+    MetricCreate(spend=2, clicks=2, impressions=2),
+    MetricCreate(spend=3, clicks=3, impressions=3),
+]
+
+
+@pytest_asyncio.fixture
+async def existing_metrics_across_campaigns(db_session):
+    """One metric per campaign across multiple campaigns. Use to test campaign-scoped filtering."""
+    campaigns = await make_campaign_list(db_session, TEST_CAMPAIGNS_MULTI)
+    campaign_ids = [campaign.id for campaign in campaigns]
+    metrics = []
+    for index in range(len(TEST_METRICS_MULTI)):
+        metric = await create_metric(db_session, campaign_ids[index], TEST_METRICS_MULTI[index])
+        metrics.append(metric)
+    return {"metrics": metrics, "campaign_ids": campaign_ids}
+
 TEST_CAMPAIGN_LIST = [
     CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
     CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
