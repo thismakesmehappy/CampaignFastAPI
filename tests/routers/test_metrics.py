@@ -10,14 +10,19 @@ from tests.conftest import (
     SUMMARY_TOTAL_CLICKS,
     SUMMARY_TOTAL_SPEND,
     SUMMARY_TOTAL_IMPRESSIONS,
+    PERIOD_START,
+    PERIOD_END,
 )
+
+PERIOD_START_STR = PERIOD_START.isoformat()
+PERIOD_END_STR = PERIOD_END.isoformat()
 
 
 class TestCreateMetric:
     async def test_create_metric(self, client, existing_campaign):
         response = await client.post(
             f"/campaigns/{existing_campaign.id}/metrics/",
-            json={"spend": TEST_METRIC.spend, "clicks": TEST_METRIC.clicks, "impressions": TEST_METRIC.impressions},
+            json={"spend": TEST_METRIC.spend, "clicks": TEST_METRIC.clicks, "impressions": TEST_METRIC.impressions, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 201
         data = response.json()
@@ -31,7 +36,7 @@ class TestCreateMetric:
         fake_id = existing_campaign.id + 1
         response = await client.post(
             f"/campaigns/{fake_id}/metrics/",
-            json={"spend": 100.0, "clicks": 50, "impressions": 1000},
+            json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 404
 
@@ -77,10 +82,31 @@ class TestCreateMetric:
         )
         assert response.status_code == 422
 
+    async def test_create_metric_period_start_missing(self, client, existing_campaign):
+        response = await client.post(
+            f"/campaigns/{existing_campaign.id}/metrics/",
+            json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_end": PERIOD_END_STR},
+        )
+        assert response.status_code == 422
+    
+    async def test_create_metric_period_end_missing(self, client, existing_campaign):
+        response = await client.post(
+            f"/campaigns/{existing_campaign.id}/metrics/",
+            json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_START_STR},
+        )
+        assert response.status_code == 422
+
+    async def test_create_metric_period_end_before_start(self, client, existing_campaign):
+        response = await client.post(
+            f"/campaigns/{existing_campaign.id}/metrics/",
+            json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_END_STR, "period_end": PERIOD_START_STR},
+        )
+        assert response.status_code == 422
+
     async def test_create_metric_zero_values_allowed(self, client, existing_campaign):
         response = await client.post(
             f"/campaigns/{existing_campaign.id}/metrics/",
-            json={"spend": 0.0, "clicks": 0, "impressions": 0},
+            json={"spend": 0.0, "clicks": 0, "impressions": 0, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 201
 
@@ -283,6 +309,13 @@ class TestUpdateMetric:
 
     async def test_update_metric_negative_impressions(self, client, existing_metric):
         response = await client.patch(f"/metrics/{existing_metric.id}/", json={"impressions": -1})
+        assert response.status_code == 422
+
+    async def test_update_metric_period_end_before_start(self, client, existing_metric):
+        response = await client.patch(
+            f"/metrics/{existing_metric.id}/",
+            json={"period_start": PERIOD_END_STR, "period_end": PERIOD_START_STR},
+        )
         assert response.status_code == 422
 
 

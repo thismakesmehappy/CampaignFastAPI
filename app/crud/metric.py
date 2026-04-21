@@ -2,10 +2,10 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Metric
-from app.schema import MetricBase, MetricUpdate, PaginatedFilter
+from app.schema import MetricBase, MetricCreate, MetricUpdate, PaginatedFilter
 
 
-async def create_metric(db: AsyncSession, campaign_id: int, data: MetricBase) -> Metric:
+async def create_metric(db: AsyncSession, campaign_id: int, data: MetricCreate) -> Metric:
     """Insert a new metric and return the created row with its generated id."""
     metric = Metric(campaign_id=campaign_id, **data.model_dump())
     db.add(metric)
@@ -56,7 +56,7 @@ async def get_metrics_summary(db: AsyncSession, campaign_id: int | None = None) 
     row = result.one()
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)
 
-async def update_metric(db: AsyncSession, metric_id: int, data: MetricBase) -> Metric | None:
+async def update_metric(db: AsyncSession, metric_id: int, data: MetricUpdate) -> Metric | None:
     """Update only the provided fields on a metric. Returns None if not found."""
     result = await db.execute(select(Metric).where(Metric.id == metric_id))
     metric = result.scalar_one_or_none()
@@ -68,6 +68,14 @@ async def update_metric(db: AsyncSession, metric_id: int, data: MetricBase) -> M
         metric.clicks = data.clicks
     if data.impressions is not None:
         metric.impressions = data.impressions
+    if data.period_start is not None:
+        metric.period_start = data.period_start
+    if data.period_end is not None:
+        metric.period_end = data.period_end
+
+    if metric.period_end < metric.period_start:
+        raise ValueError("period_end must be >= period_start")
+
     await db.commit()
     await db.refresh(metric)
     return metric

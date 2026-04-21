@@ -9,7 +9,8 @@ from app.crud.metric import create_metric
 from app.models.base import Base
 
 from app.crud.campaign import create_campaign
-from app.schema import CampaignCreate, MetricBase
+from app.schema import CampaignCreate, MetricBase, MetricCreate
+from datetime import datetime, timezone
 
 LONG_STRING = "A" * 201
 
@@ -18,7 +19,10 @@ UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
 VALID_CAMPAIGN_NAME = "Test Campaign Name"
 VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
 
-TEST_METRIC = MetricBase(spend=100.0, clicks=50, impressions=1000)
+PERIOD_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
+PERIOD_END = datetime(2026, 1, 31, tzinfo=timezone.utc)
+
+TEST_METRIC = MetricCreate(spend=100.0, clicks=50, impressions=1000, period_start=PERIOD_START, period_end=PERIOD_END)
 UPDATE_METRIC_SPEND = 200.0
 UPDATE_METRIC_CLICKS = 75
 UPDATE_METRIC_IMPRESSIONS = 2000
@@ -49,8 +53,8 @@ def make_campaign(db_session):
 @pytest_asyncio.fixture
 def make_metric(db_session):
     """Factory fixture for creating metrics with custom fields."""
-    async def _make(campaign_id, spend=0, clicks=0, impressions=0):
-        return await create_metric(db_session, campaign_id, MetricBase(spend=spend, clicks=clicks, impressions=impressions))
+    async def _make(campaign_id, spend=0, clicks=0, impressions=0, period_start=PERIOD_START, period_end=PERIOD_END):
+        return await create_metric(db_session, campaign_id, MetricCreate(spend=spend, clicks=clicks, impressions=impressions, period_start=period_start, period_end=period_end))
 
     return _make
 
@@ -74,12 +78,18 @@ async def existing_metric(db_session, existing_campaign):
 
 
 TEST_METRIC_LIST = [
-    MetricBase(spend=float(i * 10), clicks=i * 5, impressions=i * 100)
+    MetricCreate(
+        spend=float(i * 10),
+        clicks=i * 5,
+        impressions=i * 100,
+        period_start=datetime(2026, 1, i, tzinfo=timezone.utc),
+        period_end=datetime(2026, 1, i, tzinfo=timezone.utc),
+    )
     for i in range(1, 13)
 ]
 
 
-async def make_metric_list(db_session: AsyncSession, campaign_id: int, metrics_to_build: list[MetricBase]) -> list[Any]:
+async def make_metric_list(db_session: AsyncSession, campaign_id: int, metrics_to_build: list[MetricCreate]) -> list[Any]:
     metrics = []
     for metric_data in metrics_to_build:
         metric = await create_metric(db_session, campaign_id, metric_data)
@@ -101,9 +111,9 @@ TEST_CAMPAIGNS_MULTI = [
 ]
 
 TEST_METRICS_MULTI = [
-    MetricBase(spend=1.1, clicks=1, impressions=10),
-    MetricBase(spend=2.2, clicks=2, impressions=20),
-    MetricBase(spend=3.3, clicks=3, impressions=30),
+    MetricCreate(spend=1.1, clicks=1, impressions=10, period_start=datetime(2026, 1, 1, tzinfo=timezone.utc), period_end=datetime(2026, 1, 1, tzinfo=timezone.utc)),
+    MetricCreate(spend=2.2, clicks=2, impressions=20, period_start=datetime(2026, 1, 2, tzinfo=timezone.utc), period_end=datetime(2026, 1, 2, tzinfo=timezone.utc)),
+    MetricCreate(spend=3.3, clicks=3, impressions=30, period_start=datetime(2026, 1, 3, tzinfo=timezone.utc), period_end=datetime(2026, 1, 3, tzinfo=timezone.utc)),
 ]
 
 SUMMARY_TOTAL_SPEND = sum(m.spend for m in TEST_METRICS_MULTI)

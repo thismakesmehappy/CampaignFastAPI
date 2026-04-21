@@ -37,7 +37,7 @@ uv run ruff check .
 uv run pytest tests/ -v
 
 # Run a single test file
-uv run pytest tests/test_campaigns.py -v
+uv run pytest tests/routers/test_campaigns.py -v
 
 # Generate a new migration after model changes
 uv run alembic revision --autogenerate -m "describe the change"
@@ -50,31 +50,34 @@ uv run alembic upgrade head
 app/
   main.py        # FastAPI app instance, lifespan hook (runs create_all on startup)
   database.py    # Async engine, SessionLocal, Base, get_db dependency
-  models.py      # SQLAlchemy ORM table definitions
-  schemas.py     # Pydantic request/response models (separate from ORM models)
-  crud.py        # All DB queries — routes call crud, never query directly
+  constants.py   # Shared constants
+  models/        # SQLAlchemy ORM models — base.py declares Base; one file per resource
+  schema/        # Pydantic schemas — one file per resource, plus error.py and pagination.py
+  crud/          # DB queries — one file per resource; routes call crud, never query directly
   routers/       # One file per resource group, each exports a router
 alembic/
   versions/      # Auto-generated migration scripts
 tests/
-  conftest.py    # pg fixture (pmr-managed Postgres), db_session, async client
-  test_*.py      # HTTP-level tests use `client`; CRUD-level tests use `db_session`
-.env             # DATABASE_URL — not committed
+  conftest.py         # pg fixture (pmr-managed Postgres), db_session, async client
+  routers/            # HTTP-level tests use `client` fixture
+  crud/               # CRUD-level tests use `db_session` fixture directly
+  helpers/            # Shared test factory helpers (e.g. creating seeded records)
+.env                  # DATABASE_URL — not committed
 ```
 
 ## Architecture patterns
 
-**Layering:** routes → crud → db. Routes handle HTTP concerns (status codes, dependency injection). `crud.py` owns all `select`/`insert`/`update` statements. No raw queries in routers.
+**Layering:** routes → crud → db. Routes handle HTTP concerns (status codes, dependency injection). `crud/` owns all `select`/`insert`/`update` statements. No raw queries in routers.
 
 **Async everywhere:** engine, sessions, and all route handlers are async. Use `await db.execute(...)`, `await db.commit()`, `await db.refresh(obj)`.
 
 **Dependency injection:** `get_db` in `database.py` yields an `AsyncSession` via FastAPI's `Depends`. Tests override this with `app.dependency_overrides[get_db]` to inject a test session backed by the pmr Postgres container.
 
-**Schema/model split:** ORM models (in `models.py`) are never returned directly from routes. Pydantic schemas (in `schemas.py`) handle serialization. `Read` schemas set `model_config = {"from_attributes": True}` to deserialize from ORM objects.
+**Schema/model split:** ORM models (in `app/models/`) are never returned directly from routes. Pydantic schemas (in `app/schema/`) handle serialization. `Read` schemas set `model_config = {"from_attributes": True}` to deserialize from ORM objects. Both packages re-export everything through their `__init__.py`.
 
 **Migrations:** Alembic `env.py` imports `Base` from `app.models` and sets `target_metadata = Base.metadata`. After any model change, generate and apply a migration — don't rely on `create_all` in production (only used in the lifespan hook for dev convenience).
 
-**Adding a new resource:** create the ORM model in `models.py`, the Pydantic schemas in `schemas.py`, CRUD functions in `crud.py`, a new router file in `app/routers/`, and register it with `app.include_router(...)` in `app/main.py`. Generate a migration.
+**Adding a new resource:** add an ORM model in `app/models/` (and re-export from `__init__.py`), Pydantic schemas in `app/schema/`, CRUD functions in `app/crud/`, a new router file in `app/routers/`, and register it with `app.include_router(...)` in `app/main.py`. Generate a migration.
 
 ## Testing
 

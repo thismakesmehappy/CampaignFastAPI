@@ -30,6 +30,10 @@ where = ["."]
 asyncio_mode = "auto"
 addopts = "--cov=app --cov-report=term-missing"
 
+[tool.coverage.run]
+concurrency = ["greenlet", "thread"]
+branch = true
+
 [tool.uv.workspace]
 members = [
     "campaign-tracker",

@@ -5,21 +5,21 @@ from app import crud
 from app.database import get_db
 from app.schema import (
     MetricRead,
-    MetricBase,
+    MetricCreate,
     MetricUpdate,
+    MetricSummary,
     PaginatedFilter,
     PaginatedResponse,
 )
 
 from app.schema.error import ErrorResponse
-from app.schema.metric import MetricSummary
 
 router = APIRouter(tags=["metrics"])
 
 _404 = {404: {"model": ErrorResponse}}
 
 @router.post("/campaigns/{campaign_id}/metrics/", response_model=MetricRead, status_code=201, responses=_404)
-async def create_metric(campaign_id: int, data: MetricBase, db: AsyncSession = Depends(get_db)):
+async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -86,9 +86,12 @@ async def get_metric(metric_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Metric not found")
     return metric
 
-@router.patch("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses=_404)
+@router.patch("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses={**_404, 422: {"model": ErrorResponse}})
 async def update_metric(metric_id: int, data: MetricUpdate, db: AsyncSession = Depends(get_db)):
-    metric = await crud.update_metric(db, metric_id, data)
+    try:
+        metric = await crud.update_metric(db, metric_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     if not metric:
         raise HTTPException(status_code=404, detail="Metric not found")
     return metric

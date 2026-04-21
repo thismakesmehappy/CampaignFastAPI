@@ -10,7 +10,7 @@ from app.crud.metric import (
     delete_metric,
     get_metrics_summary,
 )
-from app.schema import MetricBase, MetricUpdate, PaginatedFilter
+from app.schema import MetricBase, MetricCreate, MetricUpdate, PaginatedFilter
 from tests.conftest import (
     TEST_CAMPAIGN,
     TEST_METRICS_MULTI as TEST_METRICS,
@@ -18,9 +18,11 @@ from tests.conftest import (
     SUMMARY_TOTAL_CLICKS,
     SUMMARY_TOTAL_SPEND,
     SUMMARY_TOTAL_IMPRESSIONS,
+    PERIOD_START,
+    PERIOD_END,
 )
 
-TEST_METRIC = MetricBase(spend=1, clicks=2, impressions=3)
+TEST_METRIC = MetricCreate(spend=1, clicks=2, impressions=3, period_start=PERIOD_START, period_end=PERIOD_END)
 
 UPDATE_METRIC_SPEND = 200
 UPDATE_METRIC_CLICKS = 100
