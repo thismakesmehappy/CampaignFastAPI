@@ -55,3 +55,6 @@ Thumbs.db
 # Note: alembic/versions/*.py should be committed (migration files)
 /htmlcov/
 .coverage*
+
+# Supabase CLI
+supabase/
