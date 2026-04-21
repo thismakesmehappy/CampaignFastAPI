@@ -14,7 +14,6 @@ from app.schema import MetricBase, MetricCreate, MetricUpdate, PaginatedFilter
 from tests.conftest import (
     TEST_CAMPAIGN,
     TEST_METRICS_MULTI as TEST_METRICS,
-    TEST_METRICS_MULTI,
     SUMMARY_TOTAL_CLICKS,
     SUMMARY_TOTAL_SPEND,
     SUMMARY_TOTAL_IMPRESSIONS,

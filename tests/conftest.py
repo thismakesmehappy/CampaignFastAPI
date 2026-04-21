@@ -9,7 +9,7 @@ from app.crud.metric import create_metric
 from app.models.base import Base
 
 from app.crud.campaign import create_campaign
-from app.schema import CampaignCreate, MetricBase, MetricCreate
+from app.schema import CampaignCreate, MetricCreate
 from datetime import datetime, timezone
 
 LONG_STRING = "A" * 201
