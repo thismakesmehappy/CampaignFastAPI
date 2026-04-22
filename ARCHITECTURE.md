@@ -189,38 +189,53 @@ The pattern across all three: fetch everything needed, then assemble the respons
 
 ```python
 # app/exceptions.py
-class AppError(Exception): ...
+class AppError(Exception):
+    def __init__(self) -> None:
+        self.messages = []
+
+    def capture(self, message: str) -> None:
+        self.messages.append(message)
+
+    def raise_if_any(self) -> None:
+        if self.messages:
+            raise self
 
 class NotFoundError(AppError):
-    def __init__(self, resource: str):
-        self.message = f"{resource} not found"
-        super().__init__(self.message)
+    def capture(self, resource: str) -> None:
+        self.messages.append(f"{resource} not found")
 
-class DomainValidationError(AppError):
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
+class DomainValidationError(AppError): ...
 
-class ConflictError(AppError):
-    def __init__(self, message: str):
-        self.message = message
-        super().__init__(self.message)
+class ConflictError(AppError): ...
 ```
 
 - Domain code (services, repositories) raises only `AppError` subclasses — never `HTTPException`
 - Routes never catch exceptions — they just call the service and return
 - Exception handlers registered in `main.py` catch `AppError` subclasses and map them to HTTP status codes
 - The mapping between domain errors and HTTP status codes lives exclusively in `main.py`
+- Each exception type accumulates all errors of that type before raising — errors are never mixed across types
+- Errors are reported in sequential gates: input validation → not found → domain validation; each gate stops execution if it has errors
+- `validate_input` and `validate` both raise `DomainValidationError` (422) — the distinction is when they run, not what they produce
+
+```python
+# service usage
+errors = NotFoundError()
+if not campaign:
+    errors.capture("Campaign")
+if not frequency_group:
+    errors.capture("Frequency group")
+errors.raise_if_any()
+```
 
 ```python
 # app/main.py
 @app.exception_handler(NotFoundError)
 async def not_found_handler(request, exc):
-    return JSONResponse(status_code=404, content={"message": exc.message})
+    return JSONResponse(status_code=404, content={"errors": exc.messages})
 
 @app.exception_handler(DomainValidationError)
 async def validation_handler(request, exc):
-    return JSONResponse(status_code=422, content={"message": exc.message})
+    return JSONResponse(status_code=422, content={"errors": exc.messages})
 ```
 
 ```python
