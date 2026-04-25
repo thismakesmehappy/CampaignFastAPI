@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.database import get_db
+from app.exceptions import NotFoundError, DomainValidationError
 from app.schema import (
     MetricRead,
     MetricCreate,
@@ -21,15 +22,19 @@ _404 = {404: {"model": ErrorResponse}}
 @router.post("/campaigns/{campaign_id}/metrics/", response_model=MetricRead, status_code=201, responses=_404)
 async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
+    errors = NotFoundError()
     if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
     return await crud.create_metric(db, campaign_id, data)
 
 @router.get("/campaigns/{campaign_id}/metrics/", response_model=PaginatedResponse[MetricRead], status_code=200, responses=_404)
 async def list_metrics_for_campaign(campaign_id: int, pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
+    errors = NotFoundError()
     if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
     metrics_list = await crud.list_metrics(db, pagination, campaign_id)
     total = await crud.get_total_number_of_metrics(db, campaign_id)
     has_more = pagination.offset + len(metrics_list) < total
@@ -45,8 +50,10 @@ async def list_metrics_for_campaign(campaign_id: int, pagination: PaginatedFilte
 @router.get("/campaigns/{campaign_id}/metrics/summary/", response_model=MetricSummary, status_code=200, responses=_404)
 async def list_metrics_summary_for_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
+    errors = NotFoundError()
     if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
     metrics_summary = await crud.get_metrics_summary(db, campaign_id)
     total = await crud.get_total_number_of_metrics(db, campaign_id)
     response = MetricSummary(
@@ -82,22 +89,33 @@ async def list_metrics(pagination: PaginatedFilter = Depends(), db: AsyncSession
 @router.get("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses=_404)
 async def get_metric(metric_id: int, db: AsyncSession = Depends(get_db)):
     metric = await crud.get_metric(db, metric_id)
+    errors = NotFoundError()
     if not metric:
-        raise HTTPException(status_code=404, detail="Metric not found")
+        errors.capture("Metric")
+        errors.raise_if_any()
     return metric
 
 @router.patch("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses={**_404, 422: {"model": ErrorResponse}})
 async def update_metric(metric_id: int, data: MetricUpdate, db: AsyncSession = Depends(get_db)):
+    metric = await crud.get_metric(db, metric_id)
+    not_found_errors = NotFoundError()
+    if metric is None:
+        not_found_errors.capture("Metric")
+        not_found_errors.raise_if_any()
+
     try:
         metric = await crud.update_metric(db, metric_id, data)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    if not metric:
-        raise HTTPException(status_code=404, detail="Metric not found")
+        domain_errors = DomainValidationError()
+        domain_errors.capture(str(e))
+        domain_errors.raise_if_any()
+
     return metric
 
 @router.delete("/metrics/{metric_id}/", status_code=204, responses=_404)
 async def delete_metric(metric_id: int, db: AsyncSession = Depends(get_db)):
     deleted = await crud.delete_metric(db, metric_id)
+    errors = NotFoundError()
     if not deleted:
-        raise HTTPException(status_code=404, detail="Metric not found")
+        errors.capture("Metric")
+        errors.raise_if_any()

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from app.error_handlers import register_error_handlers
 from app.routers import campaigns, metrics
 
 app = FastAPI(
@@ -10,3 +11,5 @@ app = FastAPI(
 
 app.include_router(campaigns.router)
 app.include_router(metrics.router)
+
+register_error_handlers(app)

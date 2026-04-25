@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import crud
 from app.database import get_db
+from app.exceptions import NotFoundError
 from app.schema import (
     CampaignRead,
     CampaignCreate,
@@ -31,19 +32,25 @@ async def list_campaigns(pagination: PaginatedFilter = Depends(), db: AsyncSessi
 @router.get("/{campaign_id}", response_model=CampaignRead, status_code=200, responses=_404)
 async def get_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
     campaign = await crud.get_campaign(db, campaign_id)
+    errors = NotFoundError()
     if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
     return campaign
 
 @router.patch("/{campaign_id}", response_model=CampaignRead, status_code=200, responses=_404)
 async def update_campaign(campaign_id: int, data: CampaignUpdate, db: AsyncSession = Depends(get_db)):
     campaign = await crud.update_campaign(db, campaign_id, data)
+    errors = NotFoundError()
     if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
     return campaign
 
 @router.delete("/{campaign_id}", status_code=204, responses=_404)
 async def delete_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):
     deleted = await crud.delete_campaign(db, campaign_id)
+    errors = NotFoundError()
     if not deleted:
-        raise HTTPException(status_code=404, detail="Campaign not found")
+        errors.capture("Campaign")
+        errors.raise_if_any()
