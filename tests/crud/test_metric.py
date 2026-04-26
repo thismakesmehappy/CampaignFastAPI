@@ -12,7 +12,7 @@ from app.crud.metric import (
 )
 from app.schema import MetricBase, MetricCreate, MetricUpdate, PaginatedFilter
 from tests.conftest import (
-    TEST_CAMPAIGN,
+    TEST_CAMPAIGN_CRUD,
     TEST_METRICS_MULTI as TEST_METRICS,
     SUMMARY_TOTAL_CLICKS,
     SUMMARY_TOTAL_SPEND,
@@ -29,7 +29,7 @@ UPDATE_METRIC_IMPRESSIONS = 400
 
 @pytest_asyncio.fixture
 async def existing_metric(db_session, make_metric, make_campaign):
-    campaign = await make_campaign(name=TEST_CAMPAIGN.name, client=TEST_CAMPAIGN.client)
+    campaign = await make_campaign(name=TEST_CAMPAIGN_CRUD.name, client=TEST_CAMPAIGN_CRUD.client)
     return await make_metric(campaign.id, spend=TEST_METRIC.spend, clicks=TEST_METRIC.clicks, impressions=TEST_METRIC.impressions)
 
 
@@ -162,16 +162,16 @@ class TestMetricsSummary:
         assert summary.spend == 0
         assert summary.impressions == 0
         
-    async def test_summary_for_campaign(self, db_session, existing_metrics_single_campaign, existing_campaign):
-        campaign_id = existing_campaign.id
+    async def test_summary_for_campaign(self, db_session, existing_metrics_single_campaign_crud, existing_campaign_crud):
+        campaign_id = existing_campaign_crud.id
         summary = await get_metrics_summary(db_session, campaign_id)
         assert summary
         assert summary.clicks == SUMMARY_TOTAL_CLICKS
         assert summary.spend == SUMMARY_TOTAL_SPEND
         assert summary.impressions == SUMMARY_TOTAL_IMPRESSIONS
     
-    async def test_summary_for_campaign_no_entries(self, db_session, existing_campaign):
-        campaign_id = existing_campaign.id
+    async def test_summary_for_campaign_no_entries(self, db_session, existing_campaign_crud):
+        campaign_id = existing_campaign_crud.id
         summary = await get_metrics_summary(db_session, campaign_id)
         assert summary
         assert summary.clicks == 0
