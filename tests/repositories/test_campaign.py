@@ -115,11 +115,6 @@ class TestGetTotalNumberOfCampaigns:
 
 class TestDeleteCampaign:
     async def test_delete_campaign(self, db_session, existing_campaign):
-        campaign_id = existing_campaign.id
-        deleted = await campaign_repo.delete(db_session, campaign_id)
-        assert deleted
-
-    async def test_delete_campaign_doesnt_exist(self, db_session, existing_campaign):
-        fake_id = existing_campaign.id + 1
-        deleted = await campaign_repo.delete(db_session, fake_id)
-        assert not deleted
+        await campaign_repo.delete(db_session, existing_campaign)
+        result = await campaign_repo.get(db_session, existing_campaign.id)
+        assert result is None

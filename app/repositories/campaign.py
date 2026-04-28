@@ -39,12 +39,7 @@ async def count(db: AsyncSession) -> int:
     result = await db.execute(select(func.count()).select_from(Campaign))
     return int(result.scalar() or 0)
 
-async def delete(db: AsyncSession, campaign_id: int) -> bool:
+async def delete(db: AsyncSession, campaign: Campaign) -> None:
     """Delete a campaign by id. Returns True if deleted, False if not found."""
-    result = await db.execute(select(Campaign).where(Campaign.id == campaign_id))
-    campaign = result.scalar_one_or_none()
-    if campaign is None:
-        return False
     await db.delete(campaign)
     await db.commit()
-    return True
