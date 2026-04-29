@@ -63,12 +63,7 @@ async def summarize(db: AsyncSession, campaign_id: int | None = None) -> MetricB
     row = result.one()
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)
 
-async def delete(db: AsyncSession, metric_id: int) -> bool:
+async def delete(db: AsyncSession, metric: Metric) -> None:
     """Delete a metric by id. Returns True if deleted, False if not found."""
-    result = await db.execute(select(Metric).where(Metric.id == metric_id))
-    metric = result.scalar_one_or_none()
-    if metric is None:
-        return False
     await db.delete(metric)
     await db.commit()
-    return True

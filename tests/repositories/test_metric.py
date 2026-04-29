@@ -238,10 +238,6 @@ class TestMetricsSummary:
 class TestDeleteMetric:
     async def test_delete_metric(self, db_session, existing_metric):
         metric_id = existing_metric.id
-        deleted = await metric_repo.delete(db_session, metric_id)
-        assert deleted
-
-    async def test_delete_metric_doesnt_exist(self, db_session, existing_metric):
-        fake_id = existing_metric.id + 1
-        deleted = await metric_repo.delete(db_session, fake_id)
-        assert not deleted
+        await metric_repo.delete(db_session, existing_metric)
+        result = await metric_repo.get(db_session, metric_id)
+        assert result is None
