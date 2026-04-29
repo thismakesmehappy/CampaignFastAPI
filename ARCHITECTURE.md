@@ -45,7 +45,7 @@ routers/ → services/ → repositories/ → db
 
 ## Operation Template
 
-Every mutating operation in the service layer follows this four-step sequence:
+Every operation in the service layer follows this five-step sequence, enforced via inline comments:
 
 ### Steps
 
@@ -53,135 +53,133 @@ Every mutating operation in the service layer follows this four-step sequence:
 - Pydantic runs automatically before the service is called (FastAPI handles this)
 - Add custom input rules here only if they cannot be expressed in Pydantic (rare)
 
-**2. `decorate`** — all DB calls happen here and only here, in this order:
+**2. `fetch`** — all DB calls happen here and only here, in this order:
 1. Fetch primary object — the thing being operated on; raise `NotFoundError` immediately if missing (precondition for everything else)
 2. Fetch dependencies — related entities, counts, anything else needed for validation or persistence
-3. Merge input — apply incoming data onto the primary object in place
-4. Return context — bundle everything into the context dataclass
 
 For **create** operations, skip step 1 (no primary object yet) and start with fetching dependencies.
 
 **3. `validate`** — pure, no DB calls
-- All business rules operate on the context object only
-- Each rule is a separate private function
-- Rules are registered in a list and executed in order by a `validate` orchestrator
+- All business rules run here, each as a named private function
 - Raises `DomainValidationError` or `NotFoundError` on failure
+- Empty for operations with no business rules yet — add rules here as requirements grow
 
-**4. `persist`** — dumb, no logic
-- Writes the primary object from context to the DB via the repository
+**4. `merge`** — combine data, no DB calls
+- For **mutating** operations: apply incoming fields onto the fetched ORM object in place
+- For **read** operations: assemble the response from multiple fetched results (e.g. items + total count → `PaginatedResponse`)
+- No DB calls — this step is pure assembly
+
+**5. `persist`** — dumb, no logic
+- Writes the primary object to the DB via the repository
 - Returns the saved ORM object (with generated `id` for creates, refreshed state for updates)
-- The service returns this result directly to the router; the router returns it to FastAPI which serializes it via the response model
-- Nothing above `persist` needs to know how the ID was generated or how the object was refreshed
+- The service returns this result directly to the router
+- Skipped for read operations (nothing to write)
 
-### Context objects
+### Structure
 
-Each operation defines a context dataclass containing everything `validate` and `persist` need. The engineer decides what goes in it based on the rules being enforced.
+Each operation is a single `async def` with the five steps as inline comments. No context dataclasses — the steps share local variables. Context objects can be introduced later if `validate` grows complex enough to need them.
 
 ```python
-# app/services/metric.py
-@dataclass
-class MetricUpdateContext:
-    metric: Metric           # current ORM object, merged with input
-    campaign: Campaign       # fetched dependency
-    metric_count: int        # fetched for limit validation
-```
+async def update(db, campaign_id: int, data: CampaignUpdate) -> Campaign:
+    # validate_input
 
-Context objects live inside the service file. They are not shared across services.
+    # fetch
+    campaign = await campaign_repo.get(db, campaign_id)
+    errors = NotFoundError()
+    if campaign is None:
+        errors.capture("Campaign")
+        errors.raise_if_any()
+
+    # validate
+
+    # merge
+    if data.name is not None:
+        campaign.name = data.name
+    if data.client is not None:
+        campaign.client = data.client
+
+    # persist
+    return await campaign_repo.save(db, campaign)
+```
 
 ### Validator pattern
 
-Each business rule is a named private function. Rules are registered in a list and run by the `validate` orchestrator:
+When `validate` has rules, each is a named private function:
 
 ```python
-def _validate_period(ctx: MetricUpdateContext) -> None:
-    if ctx.metric.period_end < ctx.metric.period_start:
-        raise DomainValidationError("period_end must be >= period_start")
+def _validate_period(metric: Metric) -> None:
+    errors = DomainValidationError()
+    if metric.period_end < metric.period_start:
+        errors.capture("period_end must be >= period_start")
+    errors.raise_if_any()
 
-def _validate_metric_limit(ctx: MetricUpdateContext) -> None:
-    if ctx.metric_count >= 100:
-        raise DomainValidationError("Campaign cannot have more than 100 metrics")
+_VALIDATORS = [_validate_period]
 
-_VALIDATORS = [
-    _validate_period,
-    _validate_metric_limit,
-]
-
-def validate(ctx: MetricUpdateContext) -> None:
+def _validate(metric: Metric) -> None:
     for validator in _VALIDATORS:
-        validator(ctx)
+        validator(metric)
 ```
 
-Adding a new rule = one new function + one entry in `_VALIDATORS`. The `validate` orchestrator never changes.
+Adding a new rule = one new function + one entry in `_VALIDATORS`.
 
-### Example: update metric
+### Delete operations
 
-```python
-# app/services/metric.py
-
-@dataclass
-class MetricUpdateContext:
-    metric: Metric
-    campaign: Campaign
-    metric_count: int
-
-async def _decorate(db, metric_id: int, data: MetricUpdate) -> MetricUpdateContext:
-    metric = await metric_repo.get(db, metric_id)
-    if metric is None:
-        raise NotFoundError("Metric not found")
-    campaign = await campaign_repo.get(db, metric.campaign_id)
-    metric_count = await metric_repo.count(db, metric.campaign_id)
-    apply_update(metric, data)   # merge input into ORM object in place
-    return MetricUpdateContext(metric=metric, campaign=campaign, metric_count=metric_count)
-
-async def update_metric(db, metric_id: int, data: MetricUpdate) -> Metric:
-    ctx = await _decorate(db, metric_id, data)
-    validate(ctx)
-    return await metric_repo.save(db, ctx.metric)
-```
-
-```python
-# app/routers/metrics.py
-
-@router.patch("/metrics/{metric_id}/")
-async def update_metric(metric_id: int, data: MetricUpdate, db=Depends(get_db)):
-    try:
-        return await metric_service.update_metric(db, metric_id, data)
-    except NotFoundError:
-        raise HTTPException(status_code=404, detail="Metric not found")
-    except DomainValidationError as e:
-        raise HTTPException(status_code=422, detail=str(e))
-```
+Delete does not follow the full template — there is nothing to persist. The service fetches the primary object, raises `NotFoundError` if missing, then calls `repository.delete(db, obj)`. The repository `delete` takes the ORM object (consistent with `save`), deletes it, and returns `None`.
 
 ### Read operations
 
-Read operations do not follow the mutating template — they have no decoration, validation, or persistence. Their structure is simple and self-evident, so a formal template would add ceremony without clarity.
+Read operations follow the same five-step template. `persist` is always empty (nothing to write). `merge` assembles the response from fetched data.
 
 **get** — fetch primary, raise if missing, return:
 ```python
-async def get_metric(db, metric_id) -> Metric:
-    metric = await metric_repo.get(db, metric_id)
-    if metric is None:
-        raise NotFoundError("Metric not found")
-    return metric
+async def get(db, campaign_id) -> Campaign:
+    # validate_input
+
+    # fetch
+    campaign = await campaign_repo.get(db, campaign_id)
+
+    # validate
+    errors = NotFoundError()
+    if campaign is None:
+        errors.capture("Campaign")
+        errors.raise_if_any()
+
+    # merge
+    return campaign
 ```
 
-**list** — fetch page, fetch total, assemble response, return:
+**list** — fetch page and total, assemble paginated response:
 ```python
-async def list_metrics(db, pagination, campaign_id=None) -> PaginatedResponse:
-    items = await metric_repo.list(db, pagination, campaign_id)
+async def find_all(db, pagination, campaign_id=None) -> PaginatedResponse:
+    # validate_input
+
+    # fetch
+    items = await metric_repo.find_all(db, pagination, campaign_id)
     total = await metric_repo.count(db, campaign_id)
-    return assemble_paginated(items, total, pagination)
+
+    # validate
+
+    # merge
+    has_more = pagination.offset + len(items) < total
+    return PaginatedResponse(items=items, has_more=has_more, total=total, offset=pagination.offset, limit=pagination.limit)
 ```
 
-**summary** — fetch aggregates, fetch total count, assemble response, return:
+**summary** — fetch aggregates and total count, assemble summary response:
 ```python
-async def get_metrics_summary(db, campaign_id=None) -> MetricSummary:
+async def get_summary(db, campaign_id=None) -> MetricSummary:
+    # validate_input
+
+    # fetch
     aggregates = await metric_repo.summarize(db, campaign_id)
     total = await metric_repo.count(db, campaign_id)
+
+    # validate
+
+    # merge
     return MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total, campaign_id=campaign_id)
 ```
 
-The pattern across all three: fetch everything needed, then assemble the response shape. The service owns response assembly — not the router.
+The service owns response assembly — not the router.
 
 ---
 
