@@ -26,7 +26,7 @@ async def get(db, campaign_id) -> Campaign:
     errors = NotFoundError()
     if campaign is None:
         errors.capture("Campaign")
-        errors.raise_if_any()
+    errors.raise_if_any()
 
     # merge
     # return
@@ -55,7 +55,7 @@ async def update(db, campaign_id: int, data: CampaignUpdate):
     errors = NotFoundError()
     if campaign is None:
         errors.capture("Campaign")
-        errors.raise_if_any()
+    errors.raise_if_any()
 
     # merge
     if data.name is not None:
@@ -78,7 +78,7 @@ async def delete(db, campaign_id: int):
     errors = NotFoundError()
     if campaign is None:
         errors.capture("Campaign")
-        errors.raise_if_any()
+    errors.raise_if_any()
 
     # merge
     # persist
