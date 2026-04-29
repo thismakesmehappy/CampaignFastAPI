@@ -16,7 +16,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class PaginatedFilter:
-    """Pagination parameters for CRUD list functions. Instantiate directly or via a router dependency."""
+    """Pagination parameters for list functions. Instantiate directly or via a router dependency."""
     def __init__(
         self,
         limit: int = PAGE_LIMIT_DEFAULT,

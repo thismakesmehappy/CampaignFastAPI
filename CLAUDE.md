@@ -48,26 +48,43 @@ uv run alembic upgrade head
 
 ```
 app/
-  main.py        # FastAPI app instance, lifespan hook (runs create_all on startup)
-  database.py    # Async engine, SessionLocal, Base, get_db dependency
-  constants.py   # Shared constants
-  models/        # SQLAlchemy ORM models — base.py declares Base; one file per resource
-  schema/        # Pydantic schemas — one file per resource, plus error.py and pagination.py
-  crud/          # DB queries — one file per resource; routes call crud, never query directly
-  routers/       # One file per resource group, each exports a router
+  main.py          # FastAPI app instance, lifespan hook (runs create_all on startup)
+  database.py      # Async engine, SessionLocal, Base, get_db dependency
+  constants.py     # Shared constants
+  exceptions.py    # Domain exception classes (NotFoundError, DomainValidationError)
+  models/          # SQLAlchemy ORM models — base.py declares Base; one file per resource
+  schema/          # Pydantic schemas — one file per resource, plus error.py and pagination.py
+  repositories/    # DB queries — one file per resource; services call repositories, never query directly
+  services/        # Business logic — one file per resource; routers call services
+  routers/         # One file per resource group, each exports a router
 alembic/
-  versions/      # Auto-generated migration scripts
+  versions/        # Auto-generated migration scripts
 tests/
-  conftest.py         # pg fixture (pmr-managed Postgres), db_session, async client
-  routers/            # HTTP-level tests use `client` fixture
-  crud/               # CRUD-level tests use `db_session` fixture directly
-  helpers/            # Shared test factory helpers (e.g. creating seeded records)
-.env                  # DATABASE_URL — not committed
+  conftest.py           # pg fixture (pmr-managed Postgres), db_session, shared fixtures
+  routers/              # HTTP-level tests use `client` fixture
+  repositories/         # Repository-level tests use `db_session` fixture directly
+  services/             # Service-level tests use `db_session` fixture directly
+  helpers/              # Shared test factory helpers (e.g. creating seeded records)
+.env                    # DATABASE_URL — not committed
 ```
 
 ## Architecture patterns
 
-**Layering:** routes → crud → db. Routes handle HTTP concerns (status codes, dependency injection). `crud/` owns all `select`/`insert`/`update` statements. No raw queries in routers.
+**Layering:** routes → services → repositories → db. Routes handle HTTP concerns (status codes, dependency injection). Services own business logic and domain validation. Repositories own all `select`/`insert`/`update` statements. No raw queries in routers or services.
+
+**Service operations follow a five-step template:**
+```python
+async def operation(db, ...):
+    # validate_input   — reject clearly invalid inputs before any DB call
+    # fetch            — load ORM objects from the repository
+    # validate         — domain checks against fetched state (existence, constraints)
+    # merge            — for mutations: apply incoming fields onto the ORM object in place
+    #                    for reads: assemble the response from multiple fetched results
+    # persist          — call repository save/delete
+    return result
+```
+
+**Domain exceptions:** `NotFoundError` and `DomainValidationError` are raised by services and mapped to HTTP responses by error handlers in `app/error_handlers.py`. Repositories return `None` for not-found; services own the existence check.
 
 **Async everywhere:** engine, sessions, and all route handlers are async. Use `await db.execute(...)`, `await db.commit()`, `await db.refresh(obj)`.
 
@@ -77,10 +94,10 @@ tests/
 
 **Migrations:** Alembic `env.py` imports `Base` from `app.models` and sets `target_metadata = Base.metadata`. After any model change, generate and apply a migration — don't rely on `create_all` in production (only used in the lifespan hook for dev convenience).
 
-**Adding a new resource:** add an ORM model in `app/models/` (and re-export from `__init__.py`), Pydantic schemas in `app/schema/`, CRUD functions in `app/crud/`, a new router file in `app/routers/`, and register it with `app.include_router(...)` in `app/main.py`. Generate a migration.
+**Adding a new resource:** add an ORM model in `app/models/` (and re-export from `__init__.py`), Pydantic schemas in `app/schema/`, repository functions in `app/repositories/`, service functions in `app/services/`, a new router file in `app/routers/`, and register it with `app.include_router(...)` in `app/main.py`. Generate a migration.
 
 ## Testing
 
-`pytest-mock-resources` pulls a real `postgres:15` container on first run and reuses it across the session. Each test gets an isolated schema (create_all → test → drop_all). Tests that hit routes use the `client` fixture; tests that exercise CRUD logic directly use `db_session`.
+`pytest-mock-resources` pulls a real `postgres:15` container on first run and reuses it across the session. Each test gets an isolated schema (create_all → test → drop_all). Tests that hit routes use the `client` fixture; tests that exercise repository or service logic directly use `db_session`.
 
 `asyncio_mode = "auto"` is set in `pyproject.toml` — no `@pytest.mark.asyncio` decorator needed on individual tests.

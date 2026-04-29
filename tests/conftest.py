@@ -8,8 +8,7 @@ from app.constants import PAGE_LIMIT_DEFAULT
 from app.repositories import campaign as campaign_repo, metric as metric_repo
 from app.models.base import Base
 
-from app.crud.campaign import create_campaign
-from app.schema import CampaignCreate, MetricCreate
+from app.schema import MetricCreate
 from datetime import datetime, timezone
 
 from app.models import Campaign
@@ -67,13 +66,6 @@ def make_metric(db_session):
 
     return _make
 
-async def make_campaign_list_crud(db_session: AsyncSession, campaigns_to_build: list[CampaignCreate]) -> list[Any]:
-    campaigns = []
-    for test_campaign in campaigns_to_build:
-        campaign = await create_campaign(db_session, test_campaign)
-        campaigns.append(campaign)
-    return campaigns
-
 async def make_campaign_list(db_session: AsyncSession, campaigns_to_build: list[Campaign]) -> list[Any]:
     campaigns = []
     for test_campaign in campaigns_to_build:
@@ -81,17 +73,11 @@ async def make_campaign_list(db_session: AsyncSession, campaigns_to_build: list[
         campaigns.append(campaign)
     return campaigns
 
-TEST_CAMPAIGN_CRUD = CampaignCreate(name="Test Campaign Name", client="Test Campaign Client")
-
 @pytest_asyncio.fixture
 def campaign_factory():
     def _make(name=VALID_CAMPAIGN_NAME, client=VALID_CAMPAIGN_CLIENT):
         return Campaign(name=name, client=client)
     return _make
-
-@pytest_asyncio.fixture
-async def existing_campaign_crud(db_session):
-    return await create_campaign(db_session, TEST_CAMPAIGN_CRUD)
 
 @pytest_asyncio.fixture
 async def existing_campaign(db_session, campaign_factory):
@@ -127,12 +113,6 @@ async def existing_metric_list(db_session, make_metric, make_campaign):
         await make_metric(campaign.id, spend=metric_data.spend, clicks=metric_data.clicks, impressions=metric_data.impressions, period_start=metric_data.period_start, period_end=metric_data.period_end)
     return campaign
 
-@pytest_asyncio.fixture
-async def existing_metric_list_crud(db_session, make_metric, existing_campaign_crud):
-    """DEPRECATED: use existing_metric_list. Remove when crud is removed."""
-    for metric_data in TEST_METRIC_LIST:
-        await make_metric(existing_campaign_crud.id, spend=metric_data.spend, clicks=metric_data.clicks, impressions=metric_data.impressions, period_start=metric_data.period_start, period_end=metric_data.period_end)
-
 
 LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS = min(len(TEST_METRIC_LIST), PAGE_LIMIT_DEFAULT)
 
@@ -156,12 +136,6 @@ async def existing_metrics_single_campaign(db_session, make_metric, make_campaig
     return campaign
 
 @pytest_asyncio.fixture
-async def existing_metrics_single_campaign_crud(db_session, make_metric, existing_campaign_crud):
-    """DEPRECATED: use existing_metrics_single_campaign. Remove when crud is removed."""
-    for metric in TEST_METRICS_MULTI:
-        await make_metric(existing_campaign_crud.id, spend=metric.spend, clicks=metric.clicks, impressions=metric.impressions)
-
-@pytest_asyncio.fixture
 async def existing_metrics_across_campaigns(db_session, make_metric, make_campaign):
     """One metric per campaign across multiple campaigns. Use to test campaign-scoped filtering."""
     metrics = []
@@ -172,21 +146,6 @@ async def existing_metrics_across_campaigns(db_session, make_metric, make_campai
         metrics.append(metric)
         campaign_ids.append(campaign.id)
     return {"metrics": metrics, "campaign_ids": campaign_ids}
-
-TEST_CAMPAIGN_LIST_CRUD = [
-    CampaignCreate(name="Test Campaign Name 1", client="Test Campaign Client 1"),
-    CampaignCreate(name="Test Campaign Name 2", client="Test Campaign Client 2"),
-    CampaignCreate(name="Test Campaign Name 3", client="Test Campaign Client 3"),
-    CampaignCreate(name="Test Campaign Name 4", client="Test Campaign Client 4"),
-    CampaignCreate(name="Test Campaign Name 5", client="Test Campaign Client 5"),
-    CampaignCreate(name="Test Campaign Name 6", client="Test Campaign Client 6"),
-    CampaignCreate(name="Test Campaign Name 7", client="Test Campaign Client 7"),
-    CampaignCreate(name="Test Campaign Name 8", client="Test Campaign Client 8"),
-    CampaignCreate(name="Test Campaign Name 9", client="Test Campaign Client 9"),
-    CampaignCreate(name="Test Campaign Name 10", client="Test Campaign Client 10"),
-    CampaignCreate(name="Test Campaign Name 11", client="Test Campaign Client 11"),
-    CampaignCreate(name="Test Campaign Name 12", client="Test Campaign Client 12")
-]
 
 CAMPAIGN_LIST_NAMES = [
     ("Test Campaign Name 1", "Test Campaign Client 1"),
@@ -206,11 +165,7 @@ CAMPAIGN_LIST_NAMES = [
 TEST_CAMPAIGN_LIST = [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES]
 
 @pytest_asyncio.fixture
-async def existing_campaign_list_crud(db_session):
-    return await make_campaign_list_crud(db_session, TEST_CAMPAIGN_LIST_CRUD)
-
-@pytest_asyncio.fixture
 async def existing_campaign_list(db_session):
     return await make_campaign_list(db_session, [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES])
 
-LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGN_LIST_CRUD), PAGE_LIMIT_DEFAULT)
+LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGN_LIST), PAGE_LIMIT_DEFAULT)
