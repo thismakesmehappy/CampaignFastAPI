@@ -16,7 +16,7 @@ class Campaign(Base):
     name: Mapped[str] = mapped_column(String(CAMPAIGN_NAME_MAX_LENGTH))
     client: Mapped[str] = mapped_column(String(CAMPAIGN_CLIENT_MAX_LENGTH))
     created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
-    metrics: Mapped[list["Metric"]] = relationship(back_populates="campaign")
+    metrics: Mapped[list["Metric"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
 
     @validates("name")
     def validate_name(self, key, value: str) -> str:

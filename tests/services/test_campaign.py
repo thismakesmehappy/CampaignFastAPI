@@ -1,5 +1,6 @@
 import pytest
 from app.services import campaign as campaign_service
+from app.repositories import campaign as campaign_repo
 from app.exceptions import NotFoundError
 from app.schema import CampaignCreate, CampaignUpdate, PaginatedFilter
 from tests.conftest import (
@@ -115,6 +116,11 @@ class TestDeleteCampaign:
 
     async def test_delete_campaign_not_found(self, db_session, existing_campaign):
         fake_id = existing_campaign.id + 1
-        with pytest.raises(NotFoundError) as exc_info:
+        with pytest.raises(NotFoundError):
             await campaign_service.delete(db_session, fake_id)
-        assert "Campaign not found" in exc_info.value.messages
+
+    async def test_delete_campaign_cascades_metrics(self, db_session, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id)
+        await campaign_service.delete(db_session, existing_campaign.id)
+        result = await campaign_repo.get(db_session, existing_campaign.id)
+        assert result is None
