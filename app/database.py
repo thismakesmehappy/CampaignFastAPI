@@ -6,7 +6,8 @@ import os
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://placeholder/placeholder")
 ECHO_DB = os.getenv("ECHO_DB", "false").lower() == "true"
 
-engine = create_async_engine(DATABASE_URL, echo=ECHO_DB)
+_connect_args = {"ssl": "require"} if "neon.tech" in DATABASE_URL else {}
+engine = create_async_engine(DATABASE_URL, echo=ECHO_DB, connect_args=_connect_args)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 

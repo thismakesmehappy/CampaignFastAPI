@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from app.auth import require_api_key
 
+from app.database import engine
+from app.models import Base
 from app.error_handlers import register_error_handlers
 from app.routers import campaigns, metrics
 from app.middleware import log_requests
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("STARTUP")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
     logger.info("SHUTDOWN")
 
