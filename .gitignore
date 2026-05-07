@@ -58,3 +58,6 @@ Thumbs.db
 
 # Supabase CLI
 supabase/
+
+# Local planning docs
+local/
