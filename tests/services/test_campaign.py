@@ -3,6 +3,7 @@ from app.services import campaign as campaign_service
 from app.repositories import campaign as campaign_repo
 from app.exceptions import NotFoundError
 from app.schema import CampaignCreate, CampaignUpdate, PaginatedFilter
+from app.schema.campaign import CampaignFilter
 from tests.conftest import (
     VALID_CAMPAIGN_NAME,
     VALID_CAMPAIGN_CLIENT,
@@ -74,6 +75,42 @@ class TestListCampaigns:
         response = await campaign_service.list_campaigns(db_session, pagination)
         assert response.total == 0
         assert len(response.items) == 0
+        assert response.has_more is False
+
+    async def test_list_campaigns_filter_by_name_matches_all(self, db_session, existing_campaign_list):
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="Test"))
+        assert response.total == len(TEST_CAMPAIGN_LIST)
+        assert len(response.items) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
+
+    async def test_list_campaigns_filter_by_name_matches_some(self, db_session, existing_campaign_list):
+        # "ve" appears in Five, Seven, Eleven, Twelve — 4 entries
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="ve"))
+        assert response.total == 4
+        assert len(response.items) == 4
+        assert response.has_more is False
+
+    async def test_list_campaigns_filter_by_name_matches_none(self, db_session, existing_campaign_list):
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="Invalid"))
+        assert response.total == 0
+        assert len(response.items) == 0
+        assert response.has_more is False
+
+    async def test_list_campaigns_filter_by_client_matches_some(self, db_session, existing_campaign_list):
+        # "ve" in client appears in Five, Seven, Eleven, Twelve — 4 entries
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(client_filter="ve"))
+        assert response.total == 4
+        assert len(response.items) == 4
+
+    async def test_list_campaigns_filter_by_name_and_client(self, db_session, existing_campaign_list):
+        # name contains "ev" and client contains "ve": Seven, Eleven — 2 entries
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="ev", client_filter="ve"))
+        assert response.total == 2
+        assert len(response.items) == 2
         assert response.has_more is False
 
 

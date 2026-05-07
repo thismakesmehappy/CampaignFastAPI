@@ -10,6 +10,7 @@ from app.schema import (
     CampaignUpdate,
 )
 from app.schema.error import ErrorResponse
+from app.schema.campaign import CampaignFilter
 
 from app.services import campaign as campaign_service
 
@@ -22,8 +23,8 @@ async def create_campaign(data: CampaignCreate, db: AsyncSession = Depends(get_d
     return await campaign_service.create(db, data)
 
 @router.get("/", response_model=PaginatedResponse[CampaignRead], status_code=200)
-async def list_campaigns(pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db)):
-    return await campaign_service.list_campaigns(db, pagination)
+async def list_campaigns(pagination: PaginatedFilter = Depends(), options: CampaignFilter = Depends(), db: AsyncSession = Depends(get_db)):
+    return await campaign_service.list_campaigns(db, pagination, options)
 
 @router.get("/{campaign_id}", response_model=CampaignRead, status_code=200, responses=_404)
 async def get_campaign(campaign_id: int, db: AsyncSession = Depends(get_db)):

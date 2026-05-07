@@ -2,6 +2,7 @@ from app.repositories import campaign as campaign_repo
 from app.exceptions import NotFoundError
 from app.models import Campaign
 from app.schema import CampaignCreate, PaginatedFilter, PaginatedResponse, CampaignUpdate
+from app.schema.campaign import CampaignFilter
 
 
 async def create(db, data: CampaignCreate) -> Campaign:
@@ -32,11 +33,11 @@ async def get(db, campaign_id) -> Campaign:
     # return
     return campaign
 
-async def list_campaigns(db, pagination: PaginatedFilter):
+async def list_campaigns(db, pagination: PaginatedFilter = None, options: CampaignFilter = None):
     # validate_input
     # fetch
-    campaigns_list = await campaign_repo.find_all(db, pagination)
-    total = await campaign_repo.count(db)
+    campaigns_list = await campaign_repo.find_all(db, pagination, options)
+    total = await campaign_repo.count(db, options)
 
     # validate
     # merge

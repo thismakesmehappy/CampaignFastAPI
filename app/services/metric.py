@@ -9,6 +9,8 @@ from app.schema import (
     MetricUpdate,
     MetricCreate,
 )
+from app.schema.metric import MetricFilter
+
 
 async def create(db, campaign_id: int, data: MetricCreate) -> Metric:
     # validate_input
@@ -48,14 +50,14 @@ async def get(db, metric_id) -> Metric:
     # return
     return metric
 
-async def list_metrics(db, pagination: PaginatedFilter, campaign_id: int | None = None) -> PaginatedResponse[MetricRead]:
+async def list_metrics(db, pagination: PaginatedFilter, campaign_id: int | None = None, options: MetricFilter | None = None) -> PaginatedResponse[MetricRead]:
     # validate_input
     # fetch
     campaign = None
     if campaign_id is not None:
         campaign = await campaign_repo.get(db, campaign_id)
-    metrics = await metric_repo.find_all(db, pagination, campaign_id)
-    total = await metric_repo.count(db, campaign_id)
+    metrics = await metric_repo.find_all(db, pagination, campaign_id, options)
+    total = await metric_repo.count(db, campaign_id, options)
 
     # validate
     errors = NotFoundError()
@@ -71,14 +73,14 @@ async def list_metrics(db, pagination: PaginatedFilter, campaign_id: int | None 
     # return
     return metrics_campaign
 
-async def list_metrics_summary(db, campaign_id: int | None = None) -> MetricSummary:
+async def list_metrics_summary(db, campaign_id: int | None = None, options: MetricFilter | None = None) -> MetricSummary:
     # validate_input
     # fetch
     campaign = None
     if campaign_id is not None:
         campaign = await campaign_repo.get(db, campaign_id)
-    aggregates = await metric_repo.summarize(db, campaign_id)
-    total = await metric_repo.count(db, campaign_id)
+    aggregates = await metric_repo.summarize(db, campaign_id, options)
+    total = await metric_repo.count(db, campaign_id, options)
 
     # validate
     errors = NotFoundError()

@@ -139,6 +139,47 @@ class TestListCampaign:
         items = data["items"]
         assert len(items) == 0
 
+    async def test_list_campaigns_filter_by_name_matches_all(self, client, existing_campaign_list):
+        response = await client.get("/campaigns/?name_filter=Test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == len(TEST_CAMPAIGN_LIST)
+        assert len(data["items"]) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
+
+    async def test_list_campaigns_filter_by_name_matches_some(self, client, existing_campaign_list):
+        # "ve" appears in Five, Seven, Eleven, Twelve — 4 entries
+        response = await client.get("/campaigns/?name_filter=ve")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 4
+        assert len(data["items"]) == 4
+        assert data["has_more"] is False
+
+    async def test_list_campaigns_filter_by_name_matches_none(self, client, existing_campaign_list):
+        response = await client.get("/campaigns/?name_filter=Invalid")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert len(data["items"]) == 0
+        assert data["has_more"] is False
+
+    async def test_list_campaigns_filter_by_client_matches_some(self, client, existing_campaign_list):
+        # "ve" in client appears in Five, Seven, Eleven, Twelve — 4 entries
+        response = await client.get("/campaigns/?client_filter=ve")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 4
+        assert len(data["items"]) == 4
+
+    async def test_list_campaigns_filter_by_name_and_client(self, client, existing_campaign_list):
+        # name contains "ev" and client contains "ve": Seven, Eleven — 2 entries
+        response = await client.get("/campaigns/?name_filter=ev&client_filter=ve")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 2
+        assert len(data["items"]) == 2
+        assert data["has_more"] is False
+
 
 class TestUpdateCampaign:
     async def test_update_campaign(self, client, existing_campaign):

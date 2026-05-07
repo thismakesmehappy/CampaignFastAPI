@@ -153,6 +153,36 @@ class TestListMetricsForCampaign:
         assert data["offset"] == offset
         assert len(data["items"]) == LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS
 
+    async def test_list_metrics_for_campaign_filter_by_min_spend(self, client, existing_metric_list):
+        campaign_id = existing_metric_list.id
+        # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
+        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend=50.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 8
+        for item in data["items"]:
+            assert item["spend"] >= 50.0
+
+    async def test_list_metrics_for_campaign_filter_by_spend_range(self, client, existing_metric_list):
+        campaign_id = existing_metric_list.id
+        # spend between 20 and 60 means i in 2..6, so 5 results
+        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend=20.0&max_spend=60.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 5
+
+    async def test_list_metrics_for_campaign_filter_excludes_other_campaigns(self, client, existing_metrics_across_campaigns):
+        # filter by spend of first campaign's metric; should only return that one metric
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
+        metrics = existing_metrics_across_campaigns["metrics"]
+        campaign_id = campaign_ids[0]
+        spend = metrics[0].spend
+        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend={spend}&max_spend={spend}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["campaign_id"] == campaign_id
+
     async def test_list_metrics_for_campaign_only_returns_own_metrics(self, client, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         target_id = campaign_ids[0]
@@ -250,6 +280,41 @@ class TestListMetrics:
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 0
+
+    async def test_list_metrics_filter_by_campaign_name(self, client, existing_metrics_for_campaign_filter):
+        response = await client.get("/metrics/?campaign_name_filter=Test")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 4
+        assert len(data["items"]) == 4
+
+    async def test_list_metrics_filter_by_campaign_name_and_client(self, client, existing_metrics_for_campaign_filter):
+        response = await client.get("/metrics/?campaign_name_filter=Test&campaign_client_filter=Acme")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 3
+
+    async def test_list_metrics_filter_by_campaign_name_no_match(self, client, existing_metrics_for_campaign_filter):
+        response = await client.get("/metrics/?campaign_name_filter=Invalid")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 0
+        assert len(data["items"]) == 0
+
+    async def test_list_metrics_filter_by_min_spend(self, client, existing_metric_list):
+        # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
+        response = await client.get("/metrics/?min_spend=50.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 8
+
+    async def test_list_metrics_filter_by_spend_range(self, client, existing_metric_list):
+        # spend between 20 and 60 means i in 2..6, so 5 results
+        response = await client.get("/metrics/?min_spend=20.0&max_spend=60.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 5
+        assert len(data["items"]) == 5
 
 
 class TestUpdateMetric:
@@ -399,3 +464,26 @@ class TestGetMetricsSummary:
         assert data["impressions"] == 0
         assert data["total_metrics"] == 0
         assert data["campaign_id"] is None
+
+    async def test_summary_filter_by_campaign_name(self, client, existing_metrics_for_campaign_filter):
+        # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
+        response = await client.get("/metrics/summary/?campaign_name_filter=Test")
+        assert response.status_code == 200
+        data = response.json()
+        assert round(data["spend"], 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
+        assert data["total_metrics"] == 4
+
+    async def test_summary_filter_by_spend_range(self, client, existing_metric_list):
+        # spend between 20 and 60 means i in 2..6, so 5 results
+        response = await client.get("/metrics/summary/?min_spend=20.0&max_spend=60.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["spend"] == sum(i * 10 for i in range(2, 7))
+        assert data["total_metrics"] == 5
+
+    async def test_summary_filter_no_match(self, client, existing_metric_list):
+        response = await client.get("/metrics/summary/?min_spend=9999.0")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["spend"] == 0
+        assert data["total_metrics"] == 0

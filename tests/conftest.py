@@ -1,5 +1,6 @@
 from typing import Any, AsyncGenerator
 
+import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 from pytest_mock_resources import create_postgres_fixture
@@ -50,7 +51,7 @@ async def db_session(pg) -> AsyncGenerator[AsyncSession, Any]:
     async with pg.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def make_campaign(db_session):
     """Factory fixture for creating campaigns with custom fields."""
     async def _make(name="Test Campaign", client="Acme"):
@@ -58,7 +59,7 @@ def make_campaign(db_session):
 
     return _make
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def make_metric(db_session):
     """Factory fixture for creating metrics with custom fields."""
     async def _make(campaign_id, spend=0.0, clicks=0, impressions=0, period_start=PERIOD_START, period_end=PERIOD_END):
@@ -73,7 +74,7 @@ async def make_campaign_list(db_session: AsyncSession, campaigns_to_build: list[
         campaigns.append(campaign)
     return campaigns
 
-@pytest_asyncio.fixture
+@pytest.fixture
 def campaign_factory():
     def _make(name=VALID_CAMPAIGN_NAME, client=VALID_CAMPAIGN_CLIENT):
         return Campaign(name=name, client=client)
