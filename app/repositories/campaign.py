@@ -27,23 +27,22 @@ async def get(db: AsyncSession, campaign_id: int) -> Campaign | None:
     campaign = result.scalar_one_or_none()
     return campaign
 
-def _apply_filters(query, options: CampaignFilter):
+def _apply_filters(query, options: CampaignFilter | None):
+    if options is None:
+        options = CampaignFilter()
+
     return query.where(Campaign.name.icontains(options.name_filter)).where(Campaign.client.icontains(options.client_filter))
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, options: CampaignFilter = None) -> list[Campaign]:
     """Return a paginated list of campaigns. Defaults to first page if no filter provided."""
     if data is None:
         data = PaginatedFilter()
-    if options is None:
-        options = CampaignFilter()
     query = _apply_filters(select(Campaign), options).offset(data.offset).limit(data.limit)
     result = await db.execute(query)
     return list(result.scalars().all())
 
 async def count(db: AsyncSession, options: CampaignFilter = None) -> int:
     """Return the total number of campaigns, respecting the same filters as find_all."""
-    if options is None:
-        options = CampaignFilter()
     query = _apply_filters(select(func.count()).select_from(Campaign), options)
     result = await db.execute(query)
     return int(result.scalar() or 0)

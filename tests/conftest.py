@@ -147,6 +147,35 @@ async def existing_metrics_across_campaigns(db_session, make_metric, make_campai
         campaign_ids.append(campaign.id)
     return {"metrics": metrics, "campaign_ids": campaign_ids}
 
+# Campaigns for metric filter tests:
+# - 3x name="Test Campaign", client="Acme"       (default make_campaign)
+# - 1x name="Other Campaign", client="Acme"      (different name, same client)
+# - 1x name="Test Campaign", client="Other Client" (same name, different client)
+# Total: 5 metrics
+# Filter by name="Test":  4 results (3 default + 1 same-name-different-client)
+# Filter by client="Acme": 4 results (3 default + 1 different-name-same-client)
+# Filter by name="Test" AND client="Acme": 3 results (only the defaults)
+@pytest_asyncio.fixture
+async def existing_metrics_for_campaign_filter(db_session, make_metric, make_campaign):
+    metrics = []
+    campaign_ids = []
+    for metric_data in TEST_METRICS_MULTI:
+        campaign = await make_campaign()
+        metric = await make_metric(campaign.id, spend=metric_data.spend, clicks=metric_data.clicks, impressions=metric_data.impressions)
+        metrics.append(metric)
+        campaign_ids.append(campaign.id)
+    # different name, same client
+    campaign = await make_campaign(name="Other Campaign", client="Acme")
+    metric = await make_metric(campaign.id, spend=4.4, clicks=4, impressions=40)
+    metrics.append(metric)
+    campaign_ids.append(campaign.id)
+    # same name, different client
+    campaign = await make_campaign(name="Test Campaign", client="Other Client")
+    metric = await make_metric(campaign.id, spend=5.5, clicks=5, impressions=50)
+    metrics.append(metric)
+    campaign_ids.append(campaign.id)
+    return {"metrics": metrics, "campaign_ids": campaign_ids}
+
 CAMPAIGN_LIST_NAMES = [
     ("Test Campaign Name One", "Test Campaign Client One"),
     ("Test Campaign Name Two", "Test Campaign Client Two"),

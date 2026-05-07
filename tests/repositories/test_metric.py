@@ -1,7 +1,9 @@
 import pytest_asyncio
+from datetime import datetime, timezone
 
 from app.repositories import metric as metric_repo
 from app.schema import PaginatedFilter
+from app.schema.metric import MetricFilter
 from tests.conftest import (
     TEST_METRICS_MULTI as TEST_METRICS,
     SUMMARY_TOTAL_CLICKS,
@@ -179,7 +181,103 @@ class TestFindAllMetrics:
     async def test_find_all_metrics_no_entries(self, db_session):
         metric_list = await metric_repo.find_all(db_session)
         assert len(metric_list) == 0
-        
+
+    async def test_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(campaign_name_filter="Test"))
+        assert len(metric_list) == 4
+
+    async def test_filter_by_campaign_name_no_match(self, db_session, existing_metrics_for_campaign_filter):
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(campaign_name_filter="Invalid"))
+        assert len(metric_list) == 0
+
+    async def test_filter_by_campaign_client(self, db_session, existing_metrics_for_campaign_filter):
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(campaign_client_filter="Acme"))
+        assert len(metric_list) == 4
+
+    async def test_filter_by_campaign_client_no_match(self, db_session, existing_metrics_for_campaign_filter):
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(campaign_client_filter="Invalid"))
+        assert len(metric_list) == 0
+
+    async def test_filter_by_campaign_name_and_client(self, db_session, existing_metrics_for_campaign_filter):
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(campaign_name_filter="Test", campaign_client_filter="Acme"))
+        assert len(metric_list) == 3
+
+    async def test_filter_by_min_spend(self, db_session, existing_metric_list):
+        # TEST_METRIC_LIST: spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results (capped at default limit 10)
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(min_spend=50.0))
+        assert len(metric_list) == 8
+        for metric in metric_list:
+            assert metric.spend >= 50.0
+
+    async def test_filter_by_max_spend(self, db_session, existing_metric_list):
+        # spend<=50 means i<=5, so 5 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(max_spend=50.0))
+        assert len(metric_list) == 5
+        for metric in metric_list:
+            assert metric.spend <= 50.0
+
+    async def test_filter_by_spend_range(self, db_session, existing_metric_list):
+        # spend between 20 and 60 means i in 2..6, so 5 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(min_spend=20.0, max_spend=60.0))
+        assert len(metric_list) == 5
+        for metric in metric_list:
+            assert 20.0 <= metric.spend <= 60.0
+
+    async def test_filter_by_min_clicks(self, db_session, existing_metric_list):
+        # clicks=i*5 for i in 1..12; clicks>=25 means i>=5, so 8 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(min_clicks=25))
+        assert len(metric_list) == 8
+        for metric in metric_list:
+            assert metric.clicks >= 25
+
+    async def test_filter_by_max_clicks(self, db_session, existing_metric_list):
+        # clicks<=25 means i<=5, so 5 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(max_clicks=25))
+        assert len(metric_list) == 5
+        for metric in metric_list:
+            assert metric.clicks <= 25
+
+    async def test_filter_by_min_impressions(self, db_session, existing_metric_list):
+        # impressions=i*100 for i in 1..12; impressions>=500 means i>=5, so 8 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(min_impressions=500))
+        assert len(metric_list) == 8
+        for metric in metric_list:
+            assert metric.impressions >= 500
+
+    async def test_filter_by_max_impressions(self, db_session, existing_metric_list):
+        # impressions<=500 means i<=5, so 5 results
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(max_impressions=500))
+        assert len(metric_list) == 5
+        for metric in metric_list:
+            assert metric.impressions <= 500
+
+    async def test_filter_by_period_start(self, db_session, existing_metric_list):
+        # period_start=datetime(2026, 1, i); i>=6 means 7 results
+        after = datetime(2026, 1, 6, tzinfo=timezone.utc)
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(period_start=after))
+        assert len(metric_list) == 7
+        for metric in metric_list:
+            assert metric.period_start >= after
+
+    async def test_filter_by_period_end(self, db_session, existing_metric_list):
+        # period_end=datetime(2026, 1, i); i<=6 means 6 results
+        before = datetime(2026, 1, 6, tzinfo=timezone.utc)
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(period_end=before))
+        assert len(metric_list) == 6
+        for metric in metric_list:
+            assert metric.period_end <= before
+
+    async def test_filter_by_period_range(self, db_session, existing_metric_list):
+        # i>=3 and i<=8 means i in 3..8, so 6 results
+        after = datetime(2026, 1, 3, tzinfo=timezone.utc)
+        before = datetime(2026, 1, 8, tzinfo=timezone.utc)
+        metric_list = await metric_repo.find_all(db_session, None, None, MetricFilter(period_start=after, period_end=before))
+        assert len(metric_list) == 6
+        for metric in metric_list:
+            assert metric.period_start >= after
+            assert metric.period_end <= before
+
+
 class TestCountMetrics:
     async def test_count_metrics_with_entries(self, db_session, existing_metrics_across_campaigns):
         number_of_metrics = await metric_repo.count(db_session)
@@ -193,6 +291,76 @@ class TestCountMetrics:
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         number_of_metrics = await metric_repo.count(db_session, campaign_ids[0])
         assert number_of_metrics == 1
+
+    async def test_count_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(campaign_name_filter="Test"))
+        assert number_of_metrics == 4
+
+    async def test_count_filter_by_campaign_name_no_match(self, db_session, existing_metrics_for_campaign_filter):
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(campaign_name_filter="Invalid"))
+        assert number_of_metrics == 0
+
+    async def test_count_filter_by_campaign_client(self, db_session, existing_metrics_for_campaign_filter):
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(campaign_client_filter="Acme"))
+        assert number_of_metrics == 4
+
+    async def test_count_filter_by_campaign_name_and_client(self, db_session, existing_metrics_for_campaign_filter):
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(campaign_name_filter="Test", campaign_client_filter="Acme"))
+        assert number_of_metrics == 3
+
+    async def test_count_filter_by_min_spend(self, db_session, existing_metric_list):
+        # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(min_spend=50.0))
+        assert number_of_metrics == 8
+
+    async def test_count_filter_by_max_spend(self, db_session, existing_metric_list):
+        # spend<=50 means i<=5, so 5 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(max_spend=50.0))
+        assert number_of_metrics == 5
+
+    async def test_count_filter_by_spend_range(self, db_session, existing_metric_list):
+        # spend between 20 and 60 means i in 2..6, so 5 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(min_spend=20.0, max_spend=60.0))
+        assert number_of_metrics == 5
+
+    async def test_count_filter_by_min_clicks(self, db_session, existing_metric_list):
+        # clicks=i*5 for i in 1..12; clicks>=25 means i>=5, so 8 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(min_clicks=25))
+        assert number_of_metrics == 8
+
+    async def test_count_filter_by_max_clicks(self, db_session, existing_metric_list):
+        # clicks<=25 means i<=5, so 5 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(max_clicks=25))
+        assert number_of_metrics == 5
+
+    async def test_count_filter_by_min_impressions(self, db_session, existing_metric_list):
+        # impressions=i*100 for i in 1..12; impressions>=500 means i>=5, so 8 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(min_impressions=500))
+        assert number_of_metrics == 8
+
+    async def test_count_filter_by_max_impressions(self, db_session, existing_metric_list):
+        # impressions<=500 means i<=5, so 5 results
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(max_impressions=500))
+        assert number_of_metrics == 5
+
+    async def test_count_filter_by_period_start(self, db_session, existing_metric_list):
+        # period_start=datetime(2026, 1, i); i>=6 means 7 results
+        after = datetime(2026, 1, 6, tzinfo=timezone.utc)
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(period_start=after))
+        assert number_of_metrics == 7
+
+    async def test_count_filter_by_period_end(self, db_session, existing_metric_list):
+        # period_end=datetime(2026, 1, i); i<=6 means 6 results
+        before = datetime(2026, 1, 6, tzinfo=timezone.utc)
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(period_end=before))
+        assert number_of_metrics == 6
+
+    async def test_count_filter_by_period_range(self, db_session, existing_metric_list):
+        # i>=3 and i<=8 means i in 3..8, so 6 results
+        after = datetime(2026, 1, 3, tzinfo=timezone.utc)
+        before = datetime(2026, 1, 8, tzinfo=timezone.utc)
+        number_of_metrics = await metric_repo.count(db_session, None, MetricFilter(period_start=after, period_end=before))
+        assert number_of_metrics == 6
 
 class TestMetricsSummary:
     async def test_summarize(self, db_session, existing_metrics_across_campaigns):
@@ -234,6 +402,50 @@ class TestMetricsSummary:
         assert summary.clicks == metric.clicks
         assert summary.spend == metric.spend
         assert summary.impressions == metric.impressions
+
+    async def test_summarize_filter_by_min_spend(self, db_session, existing_metric_list):
+        # spend=i*10 for i in 1..12; spend>=50 means i>=5: spend sum=50+60+...+120=780, clicks=25+30+...+60=340, impressions=500+...+1200=7800 (but default limit 10 doesn't apply to summarize)
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(min_spend=50.0))
+        assert summary.spend == sum(i * 10 for i in range(5, 13))
+        assert summary.clicks == sum(i * 5 for i in range(5, 13))
+        assert summary.impressions == sum(i * 100 for i in range(5, 13))
+
+    async def test_summarize_filter_by_max_spend(self, db_session, existing_metric_list):
+        # spend<=50 means i<=5
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(max_spend=50.0))
+        assert summary.spend == sum(i * 10 for i in range(1, 6))
+        assert summary.clicks == sum(i * 5 for i in range(1, 6))
+        assert summary.impressions == sum(i * 100 for i in range(1, 6))
+
+    async def test_summarize_filter_by_spend_range(self, db_session, existing_metric_list):
+        # spend between 20 and 60 means i in 2..6
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(min_spend=20.0, max_spend=60.0))
+        assert summary.spend == sum(i * 10 for i in range(2, 7))
+
+    async def test_summarize_filter_by_period_range(self, db_session, existing_metric_list):
+        # i>=3 and i<=8 means i in 3..8
+        after = datetime(2026, 1, 3, tzinfo=timezone.utc)
+        before = datetime(2026, 1, 8, tzinfo=timezone.utc)
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(period_start=after, period_end=before))
+        assert summary.spend == sum(i * 10 for i in range(3, 9))
+        assert summary.clicks == sum(i * 5 for i in range(3, 9))
+        assert summary.impressions == sum(i * 100 for i in range(3, 9))
+
+    async def test_summarize_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
+        # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(campaign_name_filter="Test"))
+        assert round(summary.spend, 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
+
+    async def test_summarize_filter_by_campaign_name_and_client(self, db_session, existing_metrics_for_campaign_filter):
+        # name="Test" AND client="Acme" matches 3 campaigns: spend=1.1+2.2+3.3=6.6
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(campaign_name_filter="Test", campaign_client_filter="Acme"))
+        assert round(summary.spend, 2) == round(1.1 + 2.2 + 3.3, 2)
+
+    async def test_summarize_filter_no_match(self, db_session, existing_metric_list):
+        summary = await metric_repo.summarize(db_session, None, MetricFilter(min_spend=9999.0))
+        assert summary.spend == 0
+        assert summary.clicks == 0
+        assert summary.impressions == 0
 
 class TestDeleteMetric:
     async def test_delete_metric(self, db_session, existing_metric):

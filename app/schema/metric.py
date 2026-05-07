@@ -1,6 +1,5 @@
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
-
 class MetricBase(BaseModel):
     """Basic data for metric endpoints"""
     impressions: int = Field(..., ge=0)
@@ -36,3 +35,15 @@ class MetricRead(MetricCreate):
 class MetricSummary(MetricBase):
     total_metrics: int = Field(..., ge=0)
     campaign_id: int | None = Field(None)
+
+class MetricFilter(BaseModel):
+    campaign_name_filter: str = ""
+    campaign_client_filter: str = ""
+    period_start: AwareDatetime | None  = None
+    period_end: AwareDatetime | None = None
+    min_spend: float | None = None
+    max_spend: float | None = None
+    min_clicks: int | None = None
+    max_clicks: int | None = None
+    min_impressions: int | None = None
+    max_impressions: int | None = None

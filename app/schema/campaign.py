@@ -25,6 +25,6 @@ class CampaignRead(CampaignCreate):
     model_config = {"from_attributes": True}
 
 class CampaignFilter(BaseModel):
- name_filter: str = ""
- client_filter: str = ""
+    name_filter: str = ""
+    client_filter: str = ""
 
