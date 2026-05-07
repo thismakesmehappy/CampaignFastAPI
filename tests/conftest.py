@@ -148,18 +148,18 @@ async def existing_metrics_across_campaigns(db_session, make_metric, make_campai
     return {"metrics": metrics, "campaign_ids": campaign_ids}
 
 CAMPAIGN_LIST_NAMES = [
-    ("Test Campaign Name 1", "Test Campaign Client 1"),
-    ("Test Campaign Name 2", "Test Campaign Client 2"),
-    ("Test Campaign Name 3", "Test Campaign Client 3"),
-    ("Test Campaign Name 4", "Test Campaign Client 4"),
-    ("Test Campaign Name 5", "Test Campaign Client 5"),
-    ("Test Campaign Name 6", "Test Campaign Client 6"),
-    ("Test Campaign Name 7", "Test Campaign Client 7"),
-    ("Test Campaign Name 8", "Test Campaign Client 8"),
-    ("Test Campaign Name 9", "Test Campaign Client 9"),
-    ("Test Campaign Name 10", "Test Campaign Client 10"),
-    ("Test Campaign Name 11", "Test Campaign Client 11"),
-    ("Test Campaign Name 12", "Test Campaign Client 12"),
+    ("Test Campaign Name One", "Test Campaign Client One"),
+    ("Test Campaign Name Two", "Test Campaign Client Two"),
+    ("Test Campaign Name Three", "Test Campaign Client Three"),
+    ("Test Campaign Name Four", "Test Campaign Client Four"),
+    ("Test Campaign Name Five", "Test Campaign Client Five"),
+    ("Test Campaign Name Six", "Test Campaign Client Six"),
+    ("Test Campaign Name Seven", "Test Campaign Client Seven"),
+    ("Test Campaign Name Eight", "Test Campaign Client Eight"),
+    ("Test Campaign Name Nine", "Test Campaign Client Nine"),
+    ("Test Campaign Name Ten", "Test Campaign Client Ten"),
+    ("Test Campaign Name Eleven", "Test Campaign Client Eleven"),
+    ("Test Campaign Name Twelve", "Test Campaign Client Twelve"),
 ]
 
 TEST_CAMPAIGN_LIST = [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES]

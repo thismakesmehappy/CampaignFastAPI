@@ -24,3 +24,7 @@ class CampaignRead(CampaignCreate):
     created_at: datetime
     model_config = {"from_attributes": True}
 
+class CampaignFilter(BaseModel):
+ name_filter: str = ""
+ client_filter: str = ""
+
