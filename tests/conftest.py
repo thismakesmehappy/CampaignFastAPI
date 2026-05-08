@@ -12,8 +12,8 @@ from app.models.base import Base
 from app.schema import MetricCreate
 from datetime import datetime, timezone
 
-from app.models import Campaign
-from app.models import Metric
+from app.models import Campaign, Metric, Client
+from app.repositories import client as client_repo
 
 TEST_METRIC_SPEND = 1
 TEST_METRIC_CLICKS = 2
@@ -199,3 +199,45 @@ async def existing_campaign_list(db_session):
     return await make_campaign_list(db_session, [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES])
 
 LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGN_LIST), PAGE_LIMIT_DEFAULT)
+
+VALID_CLIENT_NAME = "Test Client"
+VALID_CLIENT_API_KEY = "test-api-key"
+
+CLIENT_LIST_NAMES = [
+    ("Acme Corp", "key-acme"),
+    ("Beta Inc", "key-beta"),
+    ("Gamma LLC", "key-gamma"),
+    ("Delta Co", "key-delta"),
+    ("Epsilon Ltd", "key-epsilon"),
+    ("Zeta Group", "key-zeta"),
+    ("Eta Ventures", "key-eta"),
+    ("Theta Works", "key-theta"),
+    ("Iota Systems", "key-iota"),
+    ("Kappa Labs", "key-kappa"),
+    ("Lambda Eleven", "key-lambda"),
+    ("Mu Twelve", "key-mu"),
+]
+
+TEST_CLIENT_LIST = [Client(name=n, api_key=k) for n, k in CLIENT_LIST_NAMES]
+LENGTH_OF_CLIENT_RESULTS_DEFAULT = min(len(CLIENT_LIST_NAMES), PAGE_LIMIT_DEFAULT)
+
+
+@pytest.fixture
+def client_factory():
+    def _make(name=VALID_CLIENT_NAME, api_key=VALID_CLIENT_API_KEY):
+        return Client(name=name, api_key=api_key)
+    return _make
+
+
+@pytest_asyncio.fixture
+async def existing_client(db_session, client_factory):
+    return await client_repo.save(db_session, client_factory())
+
+
+@pytest_asyncio.fixture
+async def existing_client_list(db_session):
+    clients = []
+    for name, api_key in CLIENT_LIST_NAMES:
+        c = await client_repo.save(db_session, Client(name=name, api_key=api_key))
+        clients.append(c)
+    return clients
