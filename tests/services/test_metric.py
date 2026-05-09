@@ -77,13 +77,13 @@ class TestListMetrics:
     async def test_list_metrics_for_campaign_filter_by_min_spend(self, db_session, existing_metric_list):
         campaign_id = existing_metric_list.id
         # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), campaign_id, MetricFilter(min_spend=50.0))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), campaign_id, options=MetricFilter(min_spend=50.0))
         assert response.total == 8
 
     async def test_list_metrics_for_campaign_filter_by_spend_range(self, db_session, existing_metric_list):
         campaign_id = existing_metric_list.id
         # spend between 20 and 60 means i in 2..6, so 5 results
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), campaign_id, MetricFilter(min_spend=20.0, max_spend=60.0))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), campaign_id, options=MetricFilter(min_spend=20.0, max_spend=60.0))
         assert response.total == 5
         assert len(response.items) == 5
 
@@ -101,28 +101,28 @@ class TestListMetrics:
         assert response.has_more is False
 
     async def test_list_metrics_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(campaign_name_filter="Test"))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(campaign_name_filter="Test"))
         assert response.total == 4
         assert len(response.items) == 4
 
     async def test_list_metrics_filter_by_campaign_name_and_client(self, db_session, existing_metrics_for_campaign_filter):
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(campaign_name_filter="Test", campaign_client_filter="Acme"))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(campaign_name_filter="Test", client_name_filter="Acme"))
         assert response.total == 3
         assert len(response.items) == 3
 
     async def test_list_metrics_filter_by_campaign_name_no_match(self, db_session, existing_metrics_for_campaign_filter):
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(campaign_name_filter="Invalid"))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(campaign_name_filter="Invalid"))
         assert response.total == 0
         assert len(response.items) == 0
 
     async def test_list_metrics_filter_by_min_spend(self, db_session, existing_metric_list):
         # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(min_spend=50.0))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(min_spend=50.0))
         assert response.total == 8
 
     async def test_list_metrics_filter_by_spend_range(self, db_session, existing_metric_list):
         # spend between 20 and 60 means i in 2..6, so 5 results
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(min_spend=20.0, max_spend=60.0))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(min_spend=20.0, max_spend=60.0))
         assert response.total == 5
         assert len(response.items) == 5
 
@@ -130,7 +130,7 @@ class TestListMetrics:
         # i>=3 and i<=8, so 6 results
         after = datetime(2026, 1, 3, tzinfo=timezone.utc)
         before = datetime(2026, 1, 8, tzinfo=timezone.utc)
-        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, MetricFilter(period_start=after, period_end=before))
+        response = await metric_service.list_metrics(db_session, PaginatedFilter(), None, options=MetricFilter(period_start=after, period_end=before))
         assert response.total == 6
         assert len(response.items) == 6
 
@@ -163,18 +163,18 @@ class TestListMetricsSummary:
 
     async def test_summary_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
         # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
-        summary = await metric_service.list_metrics_summary(db_session, None, MetricFilter(campaign_name_filter="Test"))
+        summary = await metric_service.list_metrics_summary(db_session, options=MetricFilter(campaign_name_filter="Test"))
         assert round(summary.spend, 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
         assert summary.total_metrics == 4
 
     async def test_summary_filter_by_spend_range(self, db_session, existing_metric_list):
         # spend between 20 and 60 means i in 2..6, so 5 results
-        summary = await metric_service.list_metrics_summary(db_session, None, MetricFilter(min_spend=20.0, max_spend=60.0))
+        summary = await metric_service.list_metrics_summary(db_session, options=MetricFilter(min_spend=20.0, max_spend=60.0))
         assert summary.spend == sum(i * 10 for i in range(2, 7))
         assert summary.total_metrics == 5
 
     async def test_summary_filter_no_match(self, db_session, existing_metric_list):
-        summary = await metric_service.list_metrics_summary(db_session, None, MetricFilter(min_spend=9999.0))
+        summary = await metric_service.list_metrics_summary(db_session, options=MetricFilter(min_spend=9999.0))
         assert summary.spend == 0
         assert summary.total_metrics == 0
 

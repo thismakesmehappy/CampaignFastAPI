@@ -4,19 +4,25 @@ from app.services import client as client_service
 from app.schema.client import ClientCreate, ClientUpdate, ClientFilter
 from app.schema import PaginatedFilter
 from app.exceptions import NotFoundError
-from tests.conftest import VALID_CLIENT_NAME, VALID_CLIENT_API_KEY, CLIENT_LIST_NAMES
+from tests.conftest import VALID_CLIENT_NAME, CLIENT_LIST_NAMES
 
 
 class TestCreateClient:
     async def test_create_client(self, db_session):
-        data = ClientCreate(name=VALID_CLIENT_NAME, api_key=VALID_CLIENT_API_KEY)
+        data = ClientCreate(name=VALID_CLIENT_NAME)
         client = await client_service.create(db_session, data)
         assert client.id is not None
         assert client.name == VALID_CLIENT_NAME
-        assert client.api_key == VALID_CLIENT_API_KEY
+        assert client.api_key is not None
+        assert len(client.api_key) > 0
+
+    async def test_create_client_generates_unique_api_keys(self, db_session):
+        c1 = await client_service.create(db_session, ClientCreate(name="Client One"))
+        c2 = await client_service.create(db_session, ClientCreate(name="Client Two"))
+        assert c1.api_key != c2.api_key
 
     async def test_create_client_with_email(self, db_session):
-        data = ClientCreate(name=VALID_CLIENT_NAME, api_key=VALID_CLIENT_API_KEY, email="test@example.com")
+        data = ClientCreate(name=VALID_CLIENT_NAME, email="test@example.com")
         client = await client_service.create(db_session, data)
         assert client.email == "test@example.com"
 

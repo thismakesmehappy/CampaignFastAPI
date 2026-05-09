@@ -1,3 +1,5 @@
+import secrets
+
 from app.repositories import client as client_repo
 from app.exceptions import NotFoundError, DomainValidationError
 from app.models import Client
@@ -5,9 +7,9 @@ from app.schema import PaginatedFilter, PaginatedResponse
 from app.schema.client import ClientCreate, ClientUpdate, ClientFilter
 
 
-def _build_client(data) -> Client:
+def _build_client(data, api_key: str) -> Client:
     try:
-        return Client(name=data.name, api_key=data.api_key, email=data.email, notes=data.notes, is_active=data.is_active)
+        return Client(name=data.name, api_key=api_key, email=data.email, notes=data.notes, is_active=data.is_active)
     except ValueError as e:
         err = DomainValidationError()
         err.capture(str(e))
@@ -15,7 +17,7 @@ def _build_client(data) -> Client:
 
 
 async def create(db, data: ClientCreate) -> Client:
-    return await client_repo.save(db, _build_client(data))
+    return await client_repo.save(db, _build_client(data, secrets.token_urlsafe(32)))
 
 
 async def get(db, client_id: int) -> Client:

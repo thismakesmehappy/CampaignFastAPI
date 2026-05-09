@@ -1,4 +1,4 @@
-from app.repositories import campaign as campaign_repo, metric as metric_repo
+from app.repositories import campaign as campaign_repo, metric as metric_repo, client as client_repo
 from app.exceptions import NotFoundError, DomainValidationError
 from app.models import Metric
 from app.schema import (
@@ -50,20 +50,29 @@ async def get(db, metric_id) -> Metric:
     # return
     return metric
 
-async def list_metrics(db, pagination: PaginatedFilter, campaign_id: int | None = None, options: MetricFilter | None = None) -> PaginatedResponse[MetricRead]:
+async def list_metrics(db, pagination: PaginatedFilter = None, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> PaginatedResponse[MetricRead]:
     # validate_input
+    if pagination is None:
+        pagination = PaginatedFilter()
     # fetch
     campaign = None
     if campaign_id is not None:
         campaign = await campaign_repo.get(db, campaign_id)
-    metrics = await metric_repo.find_all(db, pagination, campaign_id, options)
-    total = await metric_repo.count(db, campaign_id, options)
+    client = None
+    if client_id is not None:
+        client = await client_repo.get(db, client_id)
 
     # validate
     errors = NotFoundError()
     if campaign_id is not None and campaign is None:
         errors.capture("Campaign")
+    if client_id is not None and client is None:
+        errors.capture("Client")
     errors.raise_if_any()
+
+    # fetch_metrics
+    metrics = await metric_repo.find_all(db, pagination, campaign_id, client_id, options)
+    total = await metric_repo.count(db, campaign_id, client_id, options)
 
     # merge
     has_more = pagination.offset + len(metrics) < total
@@ -73,20 +82,27 @@ async def list_metrics(db, pagination: PaginatedFilter, campaign_id: int | None 
     # return
     return metrics_campaign
 
-async def list_metrics_summary(db, campaign_id: int | None = None, options: MetricFilter | None = None) -> MetricSummary:
+async def list_metrics_summary(db, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> MetricSummary:
     # validate_input
     # fetch
     campaign = None
     if campaign_id is not None:
         campaign = await campaign_repo.get(db, campaign_id)
-    aggregates = await metric_repo.summarize(db, campaign_id, options)
-    total = await metric_repo.count(db, campaign_id, options)
+    client = None
+    if client_id is not None:
+        client = await client_repo.get(db, client_id)
 
     # validate
     errors = NotFoundError()
     if campaign_id is not None and campaign is None:
         errors.capture("Campaign")
+    if client_id is not None and client is None:
+        errors.capture("Client")
     errors.raise_if_any()
+
+    # fetch_metrics_summary
+    aggregates = await metric_repo.summarize(db, campaign_id, client_id, options)
+    total = await metric_repo.count(db, campaign_id, client_id, options)
 
     # merge
     result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total, campaign_id=campaign_id)

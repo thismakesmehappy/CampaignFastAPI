@@ -6,9 +6,7 @@ from app.schema import CampaignCreate, CampaignUpdate, PaginatedFilter
 from app.schema.campaign import CampaignFilter
 from tests.conftest import (
     VALID_CAMPAIGN_NAME,
-    VALID_CAMPAIGN_CLIENT,
     UPDATE_CAMPAIGN_NAME,
-    UPDATE_CAMPAIGN_CLIENT,
     LENGTH_OF_RESULTS_DEFAULT_FILTERS,
     TEST_CAMPAIGN_LIST,
 )
@@ -16,13 +14,18 @@ from tests.helpers.campaign import compare_campaign_list_equality
 
 
 class TestCreateCampaign:
-    async def test_create_campaign(self, db_session):
-        data = CampaignCreate(name=VALID_CAMPAIGN_NAME, client=VALID_CAMPAIGN_CLIENT)
-        campaign = await campaign_service.create(db_session, data)
+    async def test_create_campaign(self, db_session, existing_client):
+        data = CampaignCreate(name=VALID_CAMPAIGN_NAME)
+        campaign = await campaign_service.create(db_session, data, existing_client.id)
         assert campaign.id is not None
         assert campaign.id > 0
         assert campaign.name == VALID_CAMPAIGN_NAME
-        assert campaign.client == VALID_CAMPAIGN_CLIENT
+        assert campaign.client_id == existing_client.id
+
+    async def test_create_campaign_client_not_found(self, db_session, existing_client):
+        data = CampaignCreate(name=VALID_CAMPAIGN_NAME)
+        with pytest.raises(NotFoundError):
+            await campaign_service.create(db_session, data, existing_client.id + 1)
 
 
 class TestGetCampaign:
@@ -30,7 +33,7 @@ class TestGetCampaign:
         campaign = await campaign_service.get(db_session, existing_campaign.id)
         assert campaign.id == existing_campaign.id
         assert campaign.name == existing_campaign.name
-        assert campaign.client == existing_campaign.client
+        assert campaign.client_id == existing_campaign.client_id
 
     async def test_get_campaign_not_found(self, db_session, existing_campaign):
         fake_id = existing_campaign.id + 1
@@ -99,19 +102,31 @@ class TestListCampaigns:
         assert response.has_more is False
 
     async def test_list_campaigns_filter_by_client_matches_some(self, db_session, existing_campaign_list):
-        # "ve" in client appears in Five, Seven, Eleven, Twelve — 4 entries
+        # "ve" in client name: Five, Seven, Eleven, Twelve — 4 entries
         pagination = PaginatedFilter()
-        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(client_filter="ve"))
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(client_name_filter="ve"))
         assert response.total == 4
         assert len(response.items) == 4
 
     async def test_list_campaigns_filter_by_name_and_client(self, db_session, existing_campaign_list):
-        # name contains "ev" and client contains "ve": Seven, Eleven — 2 entries
+        # name contains "ev" and client name contains "ve": Seven, Eleven — 2 entries
         pagination = PaginatedFilter()
-        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="ev", client_filter="ve"))
+        response = await campaign_service.list_campaigns(db_session, pagination, CampaignFilter(name_filter="ev", client_name_filter="ve"))
         assert response.total == 2
         assert len(response.items) == 2
         assert response.has_more is False
+
+    async def test_list_campaigns_for_client(self, db_session, existing_campaign_list):
+        target = existing_campaign_list[0]
+        pagination = PaginatedFilter()
+        response = await campaign_service.list_campaigns(db_session, pagination, client_id=target.client_id)
+        assert response.total == 1
+        assert response.items[0].client_id == target.client_id
+
+    async def test_list_campaigns_for_client_not_found(self, db_session, existing_campaign_list):
+        max_id = max(c.client_id for c in existing_campaign_list)
+        with pytest.raises(NotFoundError):
+            await campaign_service.list_campaigns(db_session, client_id=max_id + 1)
 
 
 class TestUpdateCampaign:
@@ -120,21 +135,27 @@ class TestUpdateCampaign:
         campaign = await campaign_service.update(db_session, existing_campaign.id, data)
         assert campaign.id == existing_campaign.id
         assert campaign.name == UPDATE_CAMPAIGN_NAME
-        assert campaign.client == existing_campaign.client
+        assert campaign.client_id == existing_campaign.client_id
 
-    async def test_update_campaign_client(self, db_session, existing_campaign):
-        data = CampaignUpdate(client=UPDATE_CAMPAIGN_CLIENT)
+    async def test_update_campaign_client_id(self, db_session, existing_campaign, existing_client):
+        # existing_client is a different client than the one the campaign was created with
+        data = CampaignUpdate(client_id=existing_client.id)
         campaign = await campaign_service.update(db_session, existing_campaign.id, data)
         assert campaign.id == existing_campaign.id
         assert campaign.name == existing_campaign.name
-        assert campaign.client == UPDATE_CAMPAIGN_CLIENT
+        assert campaign.client_id == existing_client.id
 
-    async def test_update_campaign_name_and_client(self, db_session, existing_campaign):
-        data = CampaignUpdate(name=UPDATE_CAMPAIGN_NAME, client=UPDATE_CAMPAIGN_CLIENT)
+    async def test_update_campaign_name_and_client_id(self, db_session, existing_campaign, existing_client):
+        data = CampaignUpdate(name=UPDATE_CAMPAIGN_NAME, client_id=existing_client.id)
         campaign = await campaign_service.update(db_session, existing_campaign.id, data)
         assert campaign.id == existing_campaign.id
         assert campaign.name == UPDATE_CAMPAIGN_NAME
-        assert campaign.client == UPDATE_CAMPAIGN_CLIENT
+        assert campaign.client_id == existing_client.id
+
+    async def test_update_campaign_client_id_not_found(self, db_session, existing_campaign, existing_client):
+        data = CampaignUpdate(client_id=existing_client.id + 999)
+        with pytest.raises(NotFoundError):
+            await campaign_service.update(db_session, existing_campaign.id, data)
 
     async def test_update_campaign_not_found(self, db_session, existing_campaign):
         fake_id = existing_campaign.id + 1
