@@ -38,7 +38,7 @@ class MetricSummary(MetricBase):
 
 class MetricFilter(BaseModel):
     campaign_name_filter: str = ""
-    campaign_client_filter: str = ""
+    client_name_filter: str = ""
     period_start: AwareDatetime | None  = None
     period_end: AwareDatetime | None = None
     min_spend: float | None = None
