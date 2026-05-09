@@ -2,7 +2,7 @@ from sqlalchemy import select, func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Metric
+from app.models import Metric, Client
 from app.schema import MetricBase, PaginatedFilter
 from app.exceptions import DomainValidationError
 from app.models import Campaign
@@ -28,16 +28,21 @@ async def get(db: AsyncSession, metric_id: int) -> Metric | None:
     metric = result.scalar_one_or_none()
     return metric
 
-def _apply_filters(query, campaign_id: int | None, options: MetricFilter | None):
+def _apply_filters(query, campaign_id: int | None, client_id: int | None, options: MetricFilter | None):
     if options is None:
         options = MetricFilter()
     if campaign_id is not None:
         query = query.where(Metric.campaign_id == campaign_id)
 
-    if options.campaign_name_filter or options.campaign_client_filter:
+    needs_campaign_join = client_id is not None or options.campaign_name_filter or options.client_name_filter
+    if needs_campaign_join:
         query = query.join(Campaign, Metric.campaign_id == Campaign.id)
+    if client_id is not None:
+        query = query.where(Campaign.client_id == client_id)
+    if options.campaign_name_filter:
         query = query.where(Campaign.name.icontains(options.campaign_name_filter))
-        query = query.where(Campaign.client.icontains(options.campaign_client_filter))
+    if options.client_name_filter:
+        query = query.join(Client, Campaign.client_id == Client.id).where(Client.name.icontains(options.client_name_filter))
 
     if options.period_start is not None:
         query = query.where(Metric.period_start >= options.period_start)
@@ -58,7 +63,7 @@ def _apply_filters(query, campaign_id: int | None, options: MetricFilter | None)
 
     return query
 
-async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: int | None = None, options: MetricFilter = None) -> list[Metric]:
+async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter = None) -> list[Metric]:
     """
     Return a paginated list of metrics. Defaults to first page if no filter provided.
     If campaign_id is provided, limit count to metrics for that specific campaign.
@@ -66,27 +71,27 @@ async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: 
     if data is None:
         data = PaginatedFilter()
 
-    query = _apply_filters(select(Metric), campaign_id, options)
+    query = _apply_filters(select(Metric), campaign_id, client_id, options)
     result = await db.execute(query.offset(data.offset).limit(data.limit))
     metrics = result.scalars().all()
     return list(metrics)
 
-async def count(db: AsyncSession, campaign_id: int | None = None, options: MetricFilter | None = None) -> int:
+async def count(db: AsyncSession, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> int:
     """
     Return the total number of metric across all pages.
     If campaign_id is provided, limit count to metrics for that specific campaign.
     """
-    query = _apply_filters(select(func.count()).select_from(Metric), campaign_id, options)
+    query = _apply_filters(select(func.count()).select_from(Metric), campaign_id, client_id, options)
     count = await db.execute(query)
     return int(count.scalar() or 0)
 
-async def summarize(db: AsyncSession, campaign_id: int | None = None, options: MetricFilter | None = None) -> MetricBase:
+async def summarize(db: AsyncSession, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> MetricBase:
     query = select(
         func.sum(Metric.clicks).label("clicks"),
         func.sum(Metric.impressions).label("impressions"),
         func.sum(Metric.spend).label("spend"),
     ).select_from(Metric)
-    query = _apply_filters(query, campaign_id, options)
+    query = _apply_filters(query, campaign_id, client_id, options)
     result = await db.execute(query)
     row = result.one()
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)

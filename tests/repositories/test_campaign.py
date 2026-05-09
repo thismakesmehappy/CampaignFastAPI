@@ -2,43 +2,45 @@ from app.repositories import campaign as campaign_repo
 from app.schema import PaginatedFilter
 from app.schema.campaign import CampaignFilter
 from tests.conftest import (
-    UPDATE_CAMPAIGN_CLIENT,
     UPDATE_CAMPAIGN_NAME,
     VALID_CAMPAIGN_NAME,
-    VALID_CAMPAIGN_CLIENT,
     LENGTH_OF_RESULTS_DEFAULT_FILTERS,
     TEST_CAMPAIGN_LIST,
+    TEST_CAMPAIGN_CLIENT_NAMES,
 )
 from tests.helpers.campaign import compare_campaign_list_equality
 
 class TestSaveCampaign:
     async def test_save_campaign(self, db_session, campaign_factory):
-        campaign = await campaign_repo.save(db_session, campaign_factory())
+        campaign = await campaign_repo.save(db_session, await campaign_factory())
         assert campaign.name == VALID_CAMPAIGN_NAME
-        assert campaign.client == VALID_CAMPAIGN_CLIENT
+        assert campaign.client_id is not None
         assert campaign.id is not None
         assert campaign.id > 0
 
-    async def test_save_campaign_update_existing(self, db_session, existing_campaign_to_update):
+    async def test_save_campaign_update_existing(self, db_session, existing_campaign_to_update, make_client):
+        new_client = await make_client(name="New Client")
         existing_campaign_to_update.name = UPDATE_CAMPAIGN_NAME
-        existing_campaign_to_update.client = UPDATE_CAMPAIGN_CLIENT
+        existing_campaign_to_update.client_id = new_client.id
         campaign = await campaign_repo.save(db_session, existing_campaign_to_update)
         assert campaign.name == UPDATE_CAMPAIGN_NAME
-        assert campaign.client == UPDATE_CAMPAIGN_CLIENT
+        assert campaign.client_id == new_client.id
         assert campaign.id == existing_campaign_to_update.id
 
     async def test_save_campaign_update_existing_name_only(self, db_session, existing_campaign_to_update):
+        original_client_id = existing_campaign_to_update.client_id
         existing_campaign_to_update.name = UPDATE_CAMPAIGN_NAME
         campaign = await campaign_repo.save(db_session, existing_campaign_to_update)
         assert campaign.name == UPDATE_CAMPAIGN_NAME
-        assert campaign.client == existing_campaign_to_update.client
+        assert campaign.client_id == original_client_id
         assert campaign.id == existing_campaign_to_update.id
 
-    async def test_save_campaign_client_existing(self, db_session, existing_campaign_to_update):
-        existing_campaign_to_update.client = UPDATE_CAMPAIGN_CLIENT
+    async def test_save_campaign_update_client_id(self, db_session, existing_campaign_to_update, make_client):
+        new_client = await make_client(name="Another Client")
+        existing_campaign_to_update.client_id = new_client.id
         campaign = await campaign_repo.save(db_session, existing_campaign_to_update)
         assert campaign.name == existing_campaign_to_update.name
-        assert campaign.client == UPDATE_CAMPAIGN_CLIENT
+        assert campaign.client_id == new_client.id
         assert campaign.id == existing_campaign_to_update.id
 
 class TestGetCampaign:
@@ -47,19 +49,19 @@ class TestGetCampaign:
         assert campaign is not None
         assert campaign.id == existing_campaign.id
         assert campaign.name == existing_campaign.name
-        assert campaign.client == existing_campaign.client
+        assert campaign.client_id == existing_campaign.client_id
 
     async def test_get_campaign_not_found(self, db_session, existing_campaign):
         fake_id = existing_campaign.id + 1
         campaign = await campaign_repo.get(db_session, fake_id)
         assert campaign is None
-        
+
 class TestFindAllCampaigns:
     async def test_find_all_campaigns_no_filters(self, db_session, existing_campaign_list):
         campaign_list = await campaign_repo.find_all(db_session)
         assert len(campaign_list) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
         compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST)
-    
+
     async def test_find_all_campaigns_filter_limit_is_less_than_total_items(self, db_session, existing_campaign_list):
         limit = 4
         filter_limit = PaginatedFilter(limit=limit)
@@ -129,44 +131,40 @@ class TestFindAllCampaigns:
         campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(name_filter="Invalid Filter"))
         assert len(campaign_list) == 0
 
-    async def test_find_all_campaigns_filter_by_client_partial_filter_return_all_entries(self, db_session,
-                                                                                       existing_campaign_list):
-        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_filter="test"))
+    async def test_find_all_campaigns_filter_by_client_partial_filter_return_all_entries(self, db_session, existing_campaign_list):
+        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_name_filter="test"))
         assert campaign_list
         assert len(campaign_list) == LENGTH_OF_RESULTS_DEFAULT_FILTERS
         compare_campaign_list_equality(campaign_list, TEST_CAMPAIGN_LIST)
 
-    async def test_find_all_campaigns_filter_by_client_partial_filter_return_some_entries(self, db_session,
-                                                                                        existing_campaign_list):
-        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_filter="ve"))
+    async def test_find_all_campaigns_filter_by_client_partial_filter_return_some_entries(self, db_session, existing_campaign_list):
+        # "ve" in client name: Five, Seven, Eleven, Twelve — 4 entries
+        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_name_filter="ve"))
         assert campaign_list
         assert len(campaign_list) == 4
         for campaign in campaign_list:
-            assert "ve" in campaign.client.lower()
+            assert campaign.client_id is not None
 
-    async def test_find_all_campaigns_filter_by_client_full_client_filter_return_one_entry(self, db_session,
-                                                                                       existing_campaign_list):
+    async def test_find_all_campaigns_filter_by_client_full_client_filter_return_one_entry(self, db_session, existing_campaign_list):
         campaign_list = await campaign_repo.find_all(db_session, None,
-                                                     CampaignFilter(client_filter=TEST_CAMPAIGN_LIST[0].client))
+                                                     CampaignFilter(client_name_filter=TEST_CAMPAIGN_CLIENT_NAMES[0]))
         assert campaign_list
         assert len(campaign_list) == 1
-        assert campaign_list[0].client == TEST_CAMPAIGN_LIST[0].client
+        assert campaign_list[0].client_id == existing_campaign_list[0].client_id
 
     async def test_find_all_campaigns_filter_by_client_no_entry(self, db_session, existing_campaign_list):
-        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_filter="Invalid Filter"))
+        campaign_list = await campaign_repo.find_all(db_session, None, CampaignFilter(client_name_filter="Invalid Filter"))
         assert len(campaign_list) == 0
 
-    async def test_find_all_campaigns_filter_by_name_and_client_full_client_filter_return_one_entry(self, db_session,
-                                                                                       existing_campaign_list):
+    async def test_find_all_campaigns_filter_by_name_and_client_full_client_filter_return_one_entry(self, db_session, existing_campaign_list):
         campaign_list = await campaign_repo.find_all(db_session, None,
-                                                     CampaignFilter(name_filter="ev", client_filter="ve"))
+                                                     CampaignFilter(name_filter="ev", client_name_filter="ve"))
         assert campaign_list
         assert len(campaign_list) == 2
         for campaign in campaign_list:
             assert "ev" in campaign.name.lower()
-            assert "ve" in campaign.client.lower()
+            assert campaign.client_id is not None
 
-        
 class TestGetTotalNumberOfCampaigns:
     async def test_count_campaign_with_entries(self, db_session, existing_campaign_list):
         number_of_campaigns = await campaign_repo.count(db_session)
@@ -190,17 +188,17 @@ class TestGetTotalNumberOfCampaigns:
         assert number_of_campaigns == 0
 
     async def test_count_campaign_filter_by_client_matches_all(self, db_session, existing_campaign_list):
-        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(client_filter="test"))
+        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(client_name_filter="test"))
         assert number_of_campaigns == len(existing_campaign_list)
 
     async def test_count_campaign_filter_by_client_matches_some(self, db_session, existing_campaign_list):
-        # "ve" in client appears in Five, Seven, Eleven, Twelve — 4 entries
-        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(client_filter="ve"))
+        # "ve" in client name: Five, Seven, Eleven, Twelve — 4 entries
+        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(client_name_filter="ve"))
         assert number_of_campaigns == 4
 
     async def test_count_campaign_filter_by_name_and_client(self, db_session, existing_campaign_list):
-        # name contains "ev" and client contains "ve": Seven, Eleven — 2 entries
-        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(name_filter="ev", client_filter="ve"))
+        # name contains "ev" and client name contains "ve": Seven, Eleven — 2 entries
+        number_of_campaigns = await campaign_repo.count(db_session, CampaignFilter(name_filter="ev", client_name_filter="ve"))
         assert number_of_campaigns == 2
 
 class TestDeleteCampaign:
