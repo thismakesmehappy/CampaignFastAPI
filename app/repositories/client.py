@@ -1,24 +1,14 @@
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.models.client import Client
 from app.schema import PaginatedFilter
-from app.exceptions import DomainValidationError
 from app.schema.client import ClientFilter
+from app.repositories.base import save_with_generated_id
 
 
 async def save(db: AsyncSession, client: Client) -> Client:
-    try:
-        db.add(client)
-        await db.commit()
-        await db.refresh(client)
-        return client
-    except SQLAlchemyError as e:
-        await db.rollback()
-        error = DomainValidationError()
-        error.capture(str(e))
-        raise error from e
+    return await save_with_generated_id(db, client)
 
 
 async def get(db: AsyncSession, client_id: int) -> Client | None:

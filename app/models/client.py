@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.campaign import Campaign
 
-from sqlalchemy import String, DateTime, func
+from sqlalchemy import String, DateTime, func, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column, validates, relationship
 
 from app.constants import CAMPAIGN_NAME_MAX_LENGTH
@@ -15,7 +15,7 @@ from app.models.base import Base
 
 class Client(Base):
     __tablename__ = "clients"
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String(CAMPAIGN_NAME_MAX_LENGTH))
     api_key: Mapped[str] = mapped_column(String())
     email: Mapped[str | None] = mapped_column(String(), nullable=True)

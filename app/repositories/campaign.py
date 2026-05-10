@@ -1,26 +1,15 @@
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from app.models import Client
 from app.models.campaign import Campaign
 from app.schema import PaginatedFilter
-from app.exceptions import DomainValidationError
 from app.schema.campaign import CampaignFilter
+from app.repositories.base import save_with_generated_id
 
 
 async def save(db: AsyncSession, campaign: Campaign) -> Campaign:
-    """Insert a new campaign and return the created row with its generated id."""
-    try:
-        db.add(campaign)
-        await db.commit()
-        await db.refresh(campaign)
-        return campaign
-    except SQLAlchemyError as e:
-        await db.rollback()
-        error = DomainValidationError()
-        error.capture(str(e))
-        raise error from e
+    return await save_with_generated_id(db, campaign)
 
 async def get(db: AsyncSession, campaign_id: int) -> Campaign | None:
     """Return a single campaign by id, or None if not found."""

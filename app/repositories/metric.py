@@ -1,26 +1,15 @@
 from sqlalchemy import select, func
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Metric, Client
 from app.schema import MetricBase, PaginatedFilter
-from app.exceptions import DomainValidationError
 from app.models import Campaign
 from app.schema.metric import MetricFilter
+from app.repositories.base import save_with_generated_id
 
 
 async def save(db: AsyncSession, metric: Metric) -> Metric:
-    """Insert a new metric and return the created row with its generated id."""
-    try:
-        db.add(metric)
-        await db.commit()
-        await db.refresh(metric)
-        return metric
-    except SQLAlchemyError as e:
-        await db.rollback()
-        error = DomainValidationError()
-        error.capture(str(e))
-        raise error from e
+    return await save_with_generated_id(db, metric)
 
 async def get(db: AsyncSession, metric_id: int) -> Metric | None:
     """Return a single metric by id, or None if not found."""
