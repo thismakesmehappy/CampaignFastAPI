@@ -21,7 +21,7 @@ PERIOD_END_STR = PERIOD_END.isoformat()
 class TestCreateMetric:
     async def test_create_metric(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": TEST_METRIC.spend, "clicks": TEST_METRIC.clicks, "impressions": TEST_METRIC.impressions, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 201
@@ -35,77 +35,77 @@ class TestCreateMetric:
     async def test_create_metric_campaign_not_found(self, client, existing_campaign):
         fake_id = existing_campaign.id + 1
         response = await client.post(
-            f"/campaigns/{fake_id}/metrics/",
+            f"/campaigns/{fake_id}/metrics",
             json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 404
 
     async def test_create_metric_negative_spend(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": -1.0, "clicks": 50, "impressions": 1000},
         )
         assert response.status_code == 422
 
     async def test_create_metric_negative_clicks(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": -1, "impressions": 1000},
         )
         assert response.status_code == 422
 
     async def test_create_metric_negative_impressions(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": 50, "impressions": -1},
         )
         assert response.status_code == 422
 
     async def test_create_metric_spend_missing(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"clicks": 50, "impressions": 1000},
         )
         assert response.status_code == 422
 
     async def test_create_metric_clicks_missing(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "impressions": 1000},
         )
         assert response.status_code == 422
 
     async def test_create_metric_impressions_missing(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": 50},
         )
         assert response.status_code == 422
 
     async def test_create_metric_period_start_missing(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 422
 
     async def test_create_metric_period_end_missing(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_START_STR},
         )
         assert response.status_code == 422
 
     async def test_create_metric_period_end_before_start(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 100.0, "clicks": 50, "impressions": 1000, "period_start": PERIOD_END_STR, "period_end": PERIOD_START_STR},
         )
         assert response.status_code == 422
 
     async def test_create_metric_zero_values_allowed(self, client, existing_campaign):
         response = await client.post(
-            f"/campaigns/{existing_campaign.id}/metrics/",
+            f"/campaigns/{existing_campaign.id}/metrics",
             json={"spend": 0.0, "clicks": 0, "impressions": 0, "period_start": PERIOD_START_STR, "period_end": PERIOD_END_STR},
         )
         assert response.status_code == 201
@@ -114,7 +114,7 @@ class TestCreateMetric:
 class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign(self, client, existing_metric_list):
         campaign_id = existing_metric_list.id
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 0
@@ -125,11 +125,11 @@ class TestListMetricsForCampaign:
 
     async def test_list_metrics_for_campaign_not_found(self, client, existing_campaign):
         fake_id = existing_campaign.id + 1
-        response = await client.get(f"/campaigns/{fake_id}/metrics/")
+        response = await client.get(f"/campaigns/{fake_id}/metrics")
         assert response.status_code == 404
 
     async def test_list_metrics_for_campaign_no_entries(self, client, existing_campaign):
-        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/")
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics")
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 0
@@ -138,7 +138,7 @@ class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign_limit(self, client, existing_metric_list):
         limit = 4
         campaign_id = existing_metric_list.id
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/?limit={limit}")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics?limit={limit}")
         assert response.status_code == 200
         data = response.json()
         assert data["limit"] == limit
@@ -147,7 +147,7 @@ class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign_offset(self, client, existing_metric_list):
         offset = 1
         campaign_id = existing_metric_list.id
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/?offset={offset}")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics?offset={offset}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == offset
@@ -156,7 +156,7 @@ class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign_filter_by_min_spend(self, client, existing_metric_list):
         campaign_id = existing_metric_list.id
         # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend=50.0")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics?min_spend=50.0")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 8
@@ -166,7 +166,7 @@ class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign_filter_by_spend_range(self, client, existing_metric_list):
         campaign_id = existing_metric_list.id
         # spend between 20 and 60 means i in 2..6, so 5 results
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend=20.0&max_spend=60.0")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics?min_spend=20.0&max_spend=60.0")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 5
@@ -177,7 +177,7 @@ class TestListMetricsForCampaign:
         metrics = existing_metrics_across_campaigns["metrics"]
         campaign_id = campaign_ids[0]
         spend = metrics[0].spend
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/?min_spend={spend}&max_spend={spend}")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics?min_spend={spend}&max_spend={spend}")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
@@ -186,7 +186,7 @@ class TestListMetricsForCampaign:
     async def test_list_metrics_for_campaign_only_returns_own_metrics(self, client, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         target_id = campaign_ids[0]
-        response = await client.get(f"/campaigns/{target_id}/metrics/")
+        response = await client.get(f"/campaigns/{target_id}/metrics")
         assert response.status_code == 200
         items = response.json()["items"]
         assert len(items) == 1
@@ -195,7 +195,7 @@ class TestListMetricsForCampaign:
 
 class TestGetMetric:
     async def test_get_metric(self, client, existing_metric):
-        response = await client.get(f"/metrics/{existing_metric.id}/")
+        response = await client.get(f"/metrics/{existing_metric.id}")
         assert response.status_code == 200
         data = response.json()
         assert data["spend"] == existing_metric.spend
@@ -205,13 +205,13 @@ class TestGetMetric:
 
     async def test_get_metric_not_found(self, client, existing_metric):
         fake_id = existing_metric.id + 1
-        response = await client.get(f"/metrics/{fake_id}/")
+        response = await client.get(f"/metrics/{fake_id}")
         assert response.status_code == 404
 
 
 class TestListMetrics:
     async def test_list_metrics(self, client, existing_metric_list):
-        response = await client.get("/metrics/")
+        response = await client.get("/metrics")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 0
@@ -221,7 +221,7 @@ class TestListMetrics:
 
     async def test_list_metrics_limit_less_than_total(self, client, existing_metric_list):
         limit = 4
-        response = await client.get(f"/metrics/?limit={limit}")
+        response = await client.get(f"/metrics?limit={limit}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 0
@@ -230,7 +230,7 @@ class TestListMetrics:
 
     async def test_list_metrics_limit_greater_than_total(self, client, existing_metric_list):
         limit = len(TEST_METRIC_LIST) * 2
-        response = await client.get(f"/metrics/?limit={limit}")
+        response = await client.get(f"/metrics?limit={limit}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == 0
@@ -239,7 +239,7 @@ class TestListMetrics:
 
     async def test_list_metrics_offset(self, client, existing_metric_list):
         offset = 1
-        response = await client.get(f"/metrics/?offset={offset}")
+        response = await client.get(f"/metrics?offset={offset}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == offset
@@ -249,7 +249,7 @@ class TestListMetrics:
     async def test_list_metrics_offset_fewer_results(self, client, existing_metric_list):
         expected_results_size = 2
         offset = len(TEST_METRIC_LIST) - expected_results_size
-        response = await client.get(f"/metrics/?offset={offset}")
+        response = await client.get(f"/metrics?offset={offset}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == offset
@@ -258,7 +258,7 @@ class TestListMetrics:
 
     async def test_list_metrics_offset_past_total(self, client, existing_metric_list):
         offset = len(TEST_METRIC_LIST)
-        response = await client.get(f"/metrics/?offset={offset}")
+        response = await client.get(f"/metrics?offset={offset}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == offset
@@ -268,7 +268,7 @@ class TestListMetrics:
     async def test_list_metrics_offset_and_limit(self, client, existing_metric_list):
         offset = 1
         limit = 2
-        response = await client.get(f"/metrics/?offset={offset}&limit={limit}")
+        response = await client.get(f"/metrics?offset={offset}&limit={limit}")
         assert response.status_code == 200
         data = response.json()
         assert data["offset"] == offset
@@ -276,26 +276,26 @@ class TestListMetrics:
         assert len(data["items"]) == limit
 
     async def test_list_metrics_no_entries(self, client):
-        response = await client.get("/metrics/")
+        response = await client.get("/metrics")
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) == 0
 
     async def test_list_metrics_filter_by_campaign_name(self, client, existing_metrics_for_campaign_filter):
-        response = await client.get("/metrics/?campaign_name_filter=Test")
+        response = await client.get("/metrics?campaign_name_filter=Test")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 4
         assert len(data["items"]) == 4
 
     async def test_list_metrics_filter_by_campaign_name_and_client(self, client, existing_metrics_for_campaign_filter):
-        response = await client.get("/metrics/?campaign_name_filter=Test&campaign_client_filter=Acme")
+        response = await client.get("/metrics?campaign_name_filter=Test&client_name_filter=Acme")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 3
 
     async def test_list_metrics_filter_by_campaign_name_no_match(self, client, existing_metrics_for_campaign_filter):
-        response = await client.get("/metrics/?campaign_name_filter=Invalid")
+        response = await client.get("/metrics?campaign_name_filter=Invalid")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 0
@@ -303,14 +303,14 @@ class TestListMetrics:
 
     async def test_list_metrics_filter_by_min_spend(self, client, existing_metric_list):
         # spend=i*10 for i in 1..12; spend>=50 means i>=5, so 8 results
-        response = await client.get("/metrics/?min_spend=50.0")
+        response = await client.get("/metrics?min_spend=50.0")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 8
 
     async def test_list_metrics_filter_by_spend_range(self, client, existing_metric_list):
         # spend between 20 and 60 means i in 2..6, so 5 results
-        response = await client.get("/metrics/?min_spend=20.0&max_spend=60.0")
+        response = await client.get("/metrics?min_spend=20.0&max_spend=60.0")
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 5
@@ -320,7 +320,7 @@ class TestListMetrics:
 class TestUpdateMetric:
     async def test_update_metric_all_fields(self, client, existing_metric):
         response = await client.patch(
-            f"/metrics/{existing_metric.id}/",
+            f"/metrics/{existing_metric.id}",
             json={"spend": UPDATE_METRIC_SPEND, "clicks": UPDATE_METRIC_CLICKS, "impressions": UPDATE_METRIC_IMPRESSIONS},
         )
         assert response.status_code == 200
@@ -331,7 +331,7 @@ class TestUpdateMetric:
 
     async def test_update_metric_spend(self, client, existing_metric):
         response = await client.patch(
-            f"/metrics/{existing_metric.id}/",
+            f"/metrics/{existing_metric.id}",
             json={"spend": UPDATE_METRIC_SPEND},
         )
         assert response.status_code == 200
@@ -342,7 +342,7 @@ class TestUpdateMetric:
 
     async def test_update_metric_clicks(self, client, existing_metric):
         response = await client.patch(
-            f"/metrics/{existing_metric.id}/",
+            f"/metrics/{existing_metric.id}",
             json={"clicks": UPDATE_METRIC_CLICKS},
         )
         assert response.status_code == 200
@@ -353,7 +353,7 @@ class TestUpdateMetric:
 
     async def test_update_metric_impressions(self, client, existing_metric):
         response = await client.patch(
-            f"/metrics/{existing_metric.id}/",
+            f"/metrics/{existing_metric.id}",
             json={"impressions": UPDATE_METRIC_IMPRESSIONS},
         )
         assert response.status_code == 200
@@ -364,24 +364,24 @@ class TestUpdateMetric:
 
     async def test_update_metric_not_found(self, client, existing_metric):
         fake_id = existing_metric.id + 1
-        response = await client.patch(f"/metrics/{fake_id}/", json={"spend": UPDATE_METRIC_SPEND})
+        response = await client.patch(f"/metrics/{fake_id}", json={"spend": UPDATE_METRIC_SPEND})
         assert response.status_code == 404
 
     async def test_update_metric_negative_spend(self, client, existing_metric):
-        response = await client.patch(f"/metrics/{existing_metric.id}/", json={"spend": -1.0})
+        response = await client.patch(f"/metrics/{existing_metric.id}", json={"spend": -1.0})
         assert response.status_code == 422
 
     async def test_update_metric_negative_clicks(self, client, existing_metric):
-        response = await client.patch(f"/metrics/{existing_metric.id}/", json={"clicks": -1})
+        response = await client.patch(f"/metrics/{existing_metric.id}", json={"clicks": -1})
         assert response.status_code == 422
 
     async def test_update_metric_negative_impressions(self, client, existing_metric):
-        response = await client.patch(f"/metrics/{existing_metric.id}/", json={"impressions": -1})
+        response = await client.patch(f"/metrics/{existing_metric.id}", json={"impressions": -1})
         assert response.status_code == 422
 
     async def test_update_metric_period_end_before_start(self, client, existing_metric):
         response = await client.patch(
-            f"/metrics/{existing_metric.id}/",
+            f"/metrics/{existing_metric.id}",
             json={"period_start": PERIOD_END_STR, "period_end": PERIOD_START_STR},
         )
         assert response.status_code == 422
@@ -389,24 +389,24 @@ class TestUpdateMetric:
 
 class TestDeleteMetric:
     async def test_delete_metric(self, client, existing_metric):
-        response = await client.delete(f"/metrics/{existing_metric.id}/")
+        response = await client.delete(f"/metrics/{existing_metric.id}")
         assert response.status_code == 204
 
     async def test_delete_metric_not_found(self, client, existing_metric):
         fake_id = existing_metric.id + 1
-        response = await client.delete(f"/metrics/{fake_id}/")
+        response = await client.delete(f"/metrics/{fake_id}")
         assert response.status_code == 404
 
     async def test_delete_metric_removes_it(self, client, existing_metric):
-        await client.delete(f"/metrics/{existing_metric.id}/")
-        response = await client.get(f"/metrics/{existing_metric.id}/")
+        await client.delete(f"/metrics/{existing_metric.id}")
+        response = await client.get(f"/metrics/{existing_metric.id}")
         assert response.status_code == 404
 
 
 class TestGetMetricsSummaryForCampaign:
     async def test_summary_for_campaign(self, client, existing_metrics_single_campaign):
         campaign_id = existing_metrics_single_campaign.id
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/summary/")
+        response = await client.get(f"/campaigns/{campaign_id}/metrics/summary")
         assert response.status_code == 200
         data = response.json()
         assert data["clicks"] == SUMMARY_TOTAL_CLICKS
@@ -416,7 +416,7 @@ class TestGetMetricsSummaryForCampaign:
         assert data["campaign_id"] == campaign_id
 
     async def test_summary_for_campaign_no_entries(self, client, existing_campaign):
-        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/summary/")
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/summary")
         assert response.status_code == 200
         data = response.json()
         assert data["clicks"] == 0
@@ -427,14 +427,14 @@ class TestGetMetricsSummaryForCampaign:
 
     async def test_summary_for_campaign_not_found(self, client, existing_campaign):
         fake_id = existing_campaign.id + 1
-        response = await client.get(f"/campaigns/{fake_id}/metrics/summary/")
+        response = await client.get(f"/campaigns/{fake_id}/metrics/summary")
         assert response.status_code == 404
 
     async def test_summary_for_campaign_only_shows_own_metrics(self, client, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         metrics = existing_metrics_across_campaigns["metrics"]
         target_id = campaign_ids[0]
-        response = await client.get(f"/campaigns/{target_id}/metrics/summary/")
+        response = await client.get(f"/campaigns/{target_id}/metrics/summary")
         assert response.status_code == 200
         data = response.json()
         assert data["clicks"] == metrics[0].clicks
@@ -446,7 +446,7 @@ class TestGetMetricsSummaryForCampaign:
 
 class TestGetMetricsSummary:
     async def test_summary(self, client, existing_metrics_across_campaigns):
-        response = await client.get("/metrics/summary/")
+        response = await client.get("/metrics/summary")
         assert response.status_code == 200
         data = response.json()
         assert data["clicks"] == SUMMARY_TOTAL_CLICKS
@@ -456,7 +456,7 @@ class TestGetMetricsSummary:
         assert data["campaign_id"] is None
 
     async def test_summary_no_entries(self, client):
-        response = await client.get("/metrics/summary/")
+        response = await client.get("/metrics/summary")
         assert response.status_code == 200
         data = response.json()
         assert data["clicks"] == 0
@@ -467,7 +467,7 @@ class TestGetMetricsSummary:
 
     async def test_summary_filter_by_campaign_name(self, client, existing_metrics_for_campaign_filter):
         # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
-        response = await client.get("/metrics/summary/?campaign_name_filter=Test")
+        response = await client.get("/metrics/summary?campaign_name_filter=Test")
         assert response.status_code == 200
         data = response.json()
         assert round(data["spend"], 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
@@ -475,14 +475,14 @@ class TestGetMetricsSummary:
 
     async def test_summary_filter_by_spend_range(self, client, existing_metric_list):
         # spend between 20 and 60 means i in 2..6, so 5 results
-        response = await client.get("/metrics/summary/?min_spend=20.0&max_spend=60.0")
+        response = await client.get("/metrics/summary?min_spend=20.0&max_spend=60.0")
         assert response.status_code == 200
         data = response.json()
         assert data["spend"] == sum(i * 10 for i in range(2, 7))
         assert data["total_metrics"] == 5
 
     async def test_summary_filter_no_match(self, client, existing_metric_list):
-        response = await client.get("/metrics/summary/?min_spend=9999.0")
+        response = await client.get("/metrics/summary?min_spend=9999.0")
         assert response.status_code == 200
         data = response.json()
         assert data["spend"] == 0

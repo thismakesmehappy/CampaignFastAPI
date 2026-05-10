@@ -22,9 +22,9 @@ TEST_METRIC_IMPRESSIONS = 3
 LONG_STRING = "A" * 201
 
 UPDATE_CAMPAIGN_NAME = "Update Campaign Name"
-UPDATE_CAMPAIGN_CLIENT = "Update Campaign Client"
 VALID_CAMPAIGN_NAME = "Test Campaign Name"
-VALID_CAMPAIGN_CLIENT = "Test Campaign Client"
+VALID_CLIENT_NAME = "Test Client"
+VALID_CLIENT_API_KEY = "test-api-key"
 
 PERIOD_START = datetime(2026, 1, 1, tzinfo=timezone.utc)
 PERIOD_END = datetime(2026, 1, 31, tzinfo=timezone.utc)
@@ -52,11 +52,21 @@ async def db_session(pg) -> AsyncGenerator[AsyncSession, Any]:
         await conn.run_sync(Base.metadata.drop_all)
 
 @pytest.fixture
-def make_campaign(db_session):
-    """Factory fixture for creating campaigns with custom fields."""
-    async def _make(name="Test Campaign", client="Acme"):
-        return await campaign_repo.save(db_session, Campaign(name=name, client=client))
+def make_client(db_session):
+    """Factory fixture for creating clients."""
+    async def _make(name="Acme", api_key=None):
+        key = api_key or f"key-{name.lower().replace(' ', '-')}"
+        return await client_repo.save(db_session, Client(name=name, api_key=key))
+    return _make
 
+@pytest.fixture
+def make_campaign(db_session, make_client):
+    """Factory fixture for creating campaigns with custom fields. Creates a client if not provided."""
+    async def _make(name="Test Campaign", client_id=None, client_name="Acme"):
+        if client_id is None:
+            c = await make_client(name=client_name)
+            client_id = c.id
+        return await campaign_repo.save(db_session, Campaign(name=name, client_id=client_id))
     return _make
 
 @pytest.fixture
@@ -67,26 +77,22 @@ def make_metric(db_session):
 
     return _make
 
-async def make_campaign_list(db_session: AsyncSession, campaigns_to_build: list[Campaign]) -> list[Any]:
-    campaigns = []
-    for test_campaign in campaigns_to_build:
-        campaign = await campaign_repo.save(db_session, test_campaign)
-        campaigns.append(campaign)
-    return campaigns
-
 @pytest.fixture
-def campaign_factory():
-    def _make(name=VALID_CAMPAIGN_NAME, client=VALID_CAMPAIGN_CLIENT):
-        return Campaign(name=name, client=client)
+def campaign_factory(db_session):
+    async def _make(name=VALID_CAMPAIGN_NAME, client_id=None):
+        if client_id is None:
+            c = await client_repo.save(db_session, Client(name="Default Client", api_key="default-key"))
+            client_id = c.id
+        return Campaign(name=name, client_id=client_id)
     return _make
 
 @pytest_asyncio.fixture
-async def existing_campaign(db_session, campaign_factory):
-    return await campaign_repo.save(db_session, campaign_factory())
+async def existing_campaign(db_session, make_campaign):
+    return await make_campaign()
 
 @pytest_asyncio.fixture
-async def existing_campaign_to_update(db_session, campaign_factory):
-    return await campaign_repo.save(db_session, campaign_factory())
+async def existing_campaign_to_update(db_session, make_campaign):
+    return await make_campaign()
 
 
 @pytest_asyncio.fixture
@@ -157,21 +163,23 @@ async def existing_metrics_across_campaigns(db_session, make_metric, make_campai
 # Filter by client="Acme": 4 results (3 default + 1 different-name-same-client)
 # Filter by name="Test" AND client="Acme": 3 results (only the defaults)
 @pytest_asyncio.fixture
-async def existing_metrics_for_campaign_filter(db_session, make_metric, make_campaign):
+async def existing_metrics_for_campaign_filter(db_session, make_metric, make_campaign, make_client):
     metrics = []
     campaign_ids = []
+    acme = await make_client(name="Acme")
     for metric_data in TEST_METRICS_MULTI:
-        campaign = await make_campaign()
+        campaign = await make_campaign(client_id=acme.id)
         metric = await make_metric(campaign.id, spend=metric_data.spend, clicks=metric_data.clicks, impressions=metric_data.impressions)
         metrics.append(metric)
         campaign_ids.append(campaign.id)
-    # different name, same client
-    campaign = await make_campaign(name="Other Campaign", client="Acme")
+    # different name, same client (Acme)
+    campaign = await make_campaign(name="Other Campaign", client_id=acme.id)
     metric = await make_metric(campaign.id, spend=4.4, clicks=4, impressions=40)
     metrics.append(metric)
     campaign_ids.append(campaign.id)
     # same name, different client
-    campaign = await make_campaign(name="Test Campaign", client="Other Client")
+    other_client = await make_client(name="Other Client")
+    campaign = await make_campaign(name="Test Campaign", client_id=other_client.id)
     metric = await make_metric(campaign.id, spend=5.5, clicks=5, impressions=50)
     metrics.append(metric)
     campaign_ids.append(campaign.id)
@@ -192,16 +200,21 @@ CAMPAIGN_LIST_NAMES = [
     ("Test Campaign Name Twelve", "Test Campaign Client Twelve"),
 ]
 
-TEST_CAMPAIGN_LIST = [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES]
+# Used only for name comparisons in tests — client_id is not meaningful here
+TEST_CAMPAIGN_LIST = [Campaign(name=n, client_id=0) for n, _ in CAMPAIGN_LIST_NAMES]
+# Parallel list of client names, matching TEST_CAMPAIGN_LIST order
+TEST_CAMPAIGN_CLIENT_NAMES = [c for _, c in CAMPAIGN_LIST_NAMES]
 
 @pytest_asyncio.fixture
 async def existing_campaign_list(db_session):
-    return await make_campaign_list(db_session, [Campaign(name=n, client=c) for n, c in CAMPAIGN_LIST_NAMES])
+    campaigns = []
+    for name, client_name in CAMPAIGN_LIST_NAMES:
+        c = await client_repo.save(db_session, Client(name=client_name, api_key=f"key-{client_name.lower().replace(' ', '-')}"))
+        campaign = await campaign_repo.save(db_session, Campaign(name=name, client_id=c.id))
+        campaigns.append(campaign)
+    return campaigns
 
 LENGTH_OF_RESULTS_DEFAULT_FILTERS = min(len(TEST_CAMPAIGN_LIST), PAGE_LIMIT_DEFAULT)
-
-VALID_CLIENT_NAME = "Test Client"
-VALID_CLIENT_API_KEY = "test-api-key"
 
 CLIENT_LIST_NAMES = [
     ("Acme Corp", "key-acme"),
