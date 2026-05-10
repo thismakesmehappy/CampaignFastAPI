@@ -1,8 +1,13 @@
+from __future__ import annotations
 from datetime import datetime
 import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.campaign import Campaign
 
 from sqlalchemy import String, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column, validates
+from sqlalchemy.orm import Mapped, mapped_column, validates, relationship
 
 from app.constants import CAMPAIGN_NAME_MAX_LENGTH
 from app.models.base import Base
@@ -17,6 +22,7 @@ class Client(Base):
     notes: Mapped[str | None] = mapped_column(String(), nullable=True)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="client", cascade="all, delete-orphan")
 
     @validates("name")
     def validate_name(self, key, value: str) -> str:

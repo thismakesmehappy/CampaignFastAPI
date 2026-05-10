@@ -20,34 +20,42 @@ router = APIRouter(tags=["metrics"])
 
 _404 = {404: {"model": ErrorResponse}}
 
-@router.post("/campaigns/{campaign_id}/metrics/", response_model=MetricRead, status_code=201, responses=_404)
+@router.post("/campaigns/{campaign_id}/metrics", response_model=MetricRead, status_code=201, responses=_404)
 async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db)):
     return await metric_service.create(db, campaign_id, data)
 
-@router.get("/campaigns/{campaign_id}/metrics/", response_model=PaginatedResponse[MetricRead], status_code=200, responses=_404)
+@router.get("/campaigns/{campaign_id}/metrics", response_model=PaginatedResponse[MetricRead], status_code=200, responses=_404)
 async def list_metrics_for_campaign(campaign_id: int, pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
-    return await metric_service.list_metrics(db, pagination, campaign_id, options)
+    return await metric_service.list_metrics(db, pagination, campaign_id, None, options)
 
-@router.get("/campaigns/{campaign_id}/metrics/summary/", response_model=MetricSummary, status_code=200, responses=_404)
+@router.get("/campaigns/{campaign_id}/metrics/summary", response_model=MetricSummary, status_code=200, responses=_404)
 async def list_metrics_summary_for_campaign(campaign_id: int, db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
-    return await metric_service.list_metrics_summary(db, campaign_id, options)
+    return await metric_service.list_metrics_summary(db, campaign_id, None, options)
 
-@router.get("/metrics/summary/", response_model=MetricSummary, status_code=200)
+@router.get("/clients/{client_id}/metrics", response_model=PaginatedResponse[MetricRead], status_code=200, responses=_404)
+async def list_metrics_for_client(client_id: int, pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
+    return await metric_service.list_metrics(db, pagination, None, client_id, options)
+
+@router.get("/clients/{client_id}/metrics/summary", response_model=MetricSummary, status_code=200, responses=_404)
+async def list_metrics_summary_for_client(client_id: int, db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
+    return await metric_service.list_metrics_summary(db, None, client_id, options)
+
+@router.get("/metrics/summary", response_model=MetricSummary, status_code=200)
 async def list_metrics_summary(db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
-    return await metric_service.list_metrics_summary(db, None, options)
+    return await metric_service.list_metrics_summary(db, options=options)
 
-@router.get("/metrics/", response_model=PaginatedResponse[MetricRead], status_code=200)
+@router.get("/metrics", response_model=PaginatedResponse[MetricRead], status_code=200)
 async def list_metrics(pagination: PaginatedFilter = Depends(), db: AsyncSession = Depends(get_db), options: MetricFilter = Depends()):
-    return await metric_service.list_metrics(db, pagination, None, options)
+    return await metric_service.list_metrics(db, pagination, options=options)
 
-@router.get("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses=_404)
+@router.get("/metrics/{metric_id}", response_model=MetricRead, status_code=200, responses=_404)
 async def get_metric(metric_id: int, db: AsyncSession = Depends(get_db)):
     return await metric_service.get(db, metric_id)
 
-@router.patch("/metrics/{metric_id}/", response_model=MetricRead, status_code=200, responses={**_404, 422: {"model": ErrorResponse}})
+@router.patch("/metrics/{metric_id}", response_model=MetricRead, status_code=200, responses={**_404, 422: {"model": ErrorResponse}})
 async def update_metric(metric_id: int, data: MetricUpdate, db: AsyncSession = Depends(get_db)):
     return await metric_service.update(db, metric_id, data)
 
-@router.delete("/metrics/{metric_id}/", status_code=204, responses=_404)
+@router.delete("/metrics/{metric_id}", status_code=204, responses=_404)
 async def delete_metric(metric_id: int, db: AsyncSession = Depends(get_db)):
     await metric_service.delete(db, metric_id)

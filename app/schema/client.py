@@ -6,7 +6,6 @@ from app.constants import CAMPAIGN_NAME_MIN_LENGTH, CAMPAIGN_NAME_MAX_LENGTH
 
 class ClientCreate(BaseModel):
     name: str = Field(..., min_length=CAMPAIGN_NAME_MIN_LENGTH, max_length=CAMPAIGN_NAME_MAX_LENGTH)
-    api_key: str = Field(..., min_length=1)
     email: str | None = None
     notes: str | None = None
     is_active: bool = True
@@ -26,6 +25,7 @@ class ClientFilter(BaseModel):
 class ClientRead(BaseModel):
     id: int
     name: str
+    api_key: str
     email: str | None
     notes: str | None
     is_active: bool

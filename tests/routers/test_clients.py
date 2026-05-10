@@ -1,25 +1,22 @@
 from app.constants import PAGE_LIMIT_DEFAULT
-from tests.conftest import VALID_CLIENT_NAME, VALID_CLIENT_API_KEY, CLIENT_LIST_NAMES, LONG_STRING
+from tests.conftest import VALID_CLIENT_NAME, CLIENT_LIST_NAMES, LONG_STRING
 
 
 class TestCreateClient:
     async def test_create_client(self, client):
-        response = await client.post("/clients/", json={"name": VALID_CLIENT_NAME, "api_key": VALID_CLIENT_API_KEY})
+        response = await client.post("/clients/", json={"name": VALID_CLIENT_NAME})
         assert response.status_code == 201
         data = response.json()
         assert data["name"] == VALID_CLIENT_NAME
-        assert "api_key" not in data
+        assert "api_key" in data
+        assert len(data["api_key"]) > 0
 
     async def test_create_client_name_too_long(self, client):
-        response = await client.post("/clients/", json={"name": LONG_STRING, "api_key": VALID_CLIENT_API_KEY})
+        response = await client.post("/clients/", json={"name": LONG_STRING})
         assert response.status_code == 422
 
     async def test_create_client_name_missing(self, client):
-        response = await client.post("/clients/", json={"api_key": VALID_CLIENT_API_KEY})
-        assert response.status_code == 422
-
-    async def test_create_client_api_key_missing(self, client):
-        response = await client.post("/clients/", json={"name": VALID_CLIENT_NAME})
+        response = await client.post("/clients/", json={})
         assert response.status_code == 422
 
 
@@ -29,7 +26,7 @@ class TestGetClient:
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == existing_client.name
-        assert "api_key" not in data
+        assert "api_key" in data
 
     async def test_get_client_not_found(self, client, existing_client):
         response = await client.get(f"/clients/{existing_client.id + 1}")
