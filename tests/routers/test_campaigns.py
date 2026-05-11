@@ -174,6 +174,16 @@ class TestListCampaign:
         assert len(data["items"]) == 2
         assert data["has_more"] is False
 
+    async def test_list_campaigns_filter_by_ids(self, client, existing_campaign_list):
+        ids = f"{existing_campaign_list[0].id},{existing_campaign_list[1].id}"
+        response = await client.get("/campaigns", params={"ids": ids})
+        assert response.status_code == 200
+        assert response.json()["total"] == 2
+
+    async def test_list_campaigns_filter_by_ids_not_found(self, client, existing_campaign_list):
+        response = await client.get("/campaigns", params={"ids": "999999999999"})
+        assert response.status_code == 404
+
 
 class TestListCampaignForClient:
     async def test_list_campaigns_for_client(self, client, existing_campaign_list):

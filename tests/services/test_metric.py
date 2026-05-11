@@ -134,6 +134,16 @@ class TestListMetrics:
         assert response.total == 6
         assert len(response.items) == 6
 
+    async def test_list_metrics_filter_by_ids(self, db_session, existing_metrics):
+        ids = [existing_metrics[0].id, existing_metrics[1].id]
+        result = await metric_service.list_metrics(db_session, options=MetricFilter(ids=f"{ids[0]},{ids[1]}"))
+        assert result.total == 2
+        assert {m.id for m in result.items} == set(ids)
+
+    async def test_list_metrics_filter_by_ids_not_found(self, db_session, existing_metrics):
+        with pytest.raises(NotFoundError):
+            await metric_service.list_metrics(db_session, options=MetricFilter(ids="999999999999"))
+
 
 class TestListMetricsSummary:
     async def test_summary_all(self, db_session, existing_metrics_across_campaigns):

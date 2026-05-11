@@ -26,3 +26,8 @@ class CampaignRead(CampaignCreate):
 class CampaignFilter(BaseModel):
     name_filter: str = ""
     client_name_filter: str = ""
+    ids: str = ""
+
+    @property
+    def id_list(self) -> list[int]:
+        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []

@@ -34,6 +34,15 @@ async def list_clients(db, pagination: PaginatedFilter = None, options: ClientFi
         pagination = PaginatedFilter()
     clients = await client_repo.find_all(db, pagination, options)
     total = await client_repo.count(db, options)
+
+    if options and options.id_list:
+        found_ids = {c.id for c in clients}
+        errors = NotFoundError()
+        for id_ in options.id_list:
+            if id_ not in found_ids:
+                errors.capture(f"Client {id_}")
+        errors.raise_if_any()
+
     has_more = pagination.offset + len(clients) < total
     return PaginatedResponse(items=clients, has_more=has_more, total=total, offset=pagination.offset, limit=pagination.limit)
 

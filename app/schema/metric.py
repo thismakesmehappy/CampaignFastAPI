@@ -39,6 +39,11 @@ class MetricSummary(MetricBase):
 class MetricFilter(BaseModel):
     campaign_name_filter: str = ""
     client_name_filter: str = ""
+    ids: str = ""
+
+    @property
+    def id_list(self) -> list[int]:
+        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
     period_start: AwareDatetime | None  = None
     period_end: AwareDatetime | None = None
     min_spend: float | None = None

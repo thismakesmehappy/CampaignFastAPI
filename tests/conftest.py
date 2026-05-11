@@ -121,6 +121,16 @@ async def existing_metric_list(db_session, make_metric, make_campaign):
     return campaign
 
 
+@pytest_asyncio.fixture
+async def existing_metrics(db_session, make_metric, make_campaign):
+    campaign = await make_campaign()
+    metrics = []
+    for metric_data in TEST_METRIC_LIST:
+        metric = await make_metric(campaign.id, spend=metric_data.spend, clicks=metric_data.clicks, impressions=metric_data.impressions, period_start=metric_data.period_start, period_end=metric_data.period_end)
+        metrics.append(metric)
+    return metrics
+
+
 LENGTH_OF_METRIC_RESULTS_DEFAULT_FILTERS = min(len(TEST_METRIC_LIST), PAGE_LIMIT_DEFAULT)
 
 TEST_METRICS_MULTI = [

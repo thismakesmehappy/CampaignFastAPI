@@ -64,6 +64,16 @@ class TestListClients:
         assert result.total == 0
         assert result.items == []
 
+    async def test_list_clients_filter_by_ids(self, db_session, existing_client_list):
+        ids = [existing_client_list[0].id, existing_client_list[1].id]
+        result = await client_service.list_clients(db_session, options=ClientFilter(ids=f"{ids[0]},{ids[1]}"))
+        assert result.total == 2
+        assert {c.id for c in result.items} == set(ids)
+
+    async def test_list_clients_filter_by_ids_not_found(self, db_session, existing_client_list):
+        with pytest.raises(NotFoundError):
+            await client_service.list_clients(db_session, options=ClientFilter(ids="999999999999"))
+
 
 class TestUpdateClient:
     async def test_update_name(self, db_session, existing_client):

@@ -128,6 +128,16 @@ class TestListCampaigns:
         with pytest.raises(NotFoundError):
             await campaign_service.list_campaigns(db_session, client_id=max_id + 1)
 
+    async def test_list_campaigns_filter_by_ids(self, db_session, existing_campaign_list):
+        ids = [existing_campaign_list[0].id, existing_campaign_list[1].id]
+        result = await campaign_service.list_campaigns(db_session, options=CampaignFilter(ids=f"{ids[0]},{ids[1]}"))
+        assert result.total == 2
+        assert {c.id for c in result.items} == set(ids)
+
+    async def test_list_campaigns_filter_by_ids_not_found(self, db_session, existing_campaign_list):
+        with pytest.raises(NotFoundError):
+            await campaign_service.list_campaigns(db_session, options=CampaignFilter(ids="999999999999"))
+
 
 class TestUpdateCampaign:
     async def test_update_campaign_name(self, db_session, existing_campaign):

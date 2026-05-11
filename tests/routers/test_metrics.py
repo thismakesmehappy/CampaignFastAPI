@@ -316,6 +316,16 @@ class TestListMetrics:
         assert data["total"] == 5
         assert len(data["items"]) == 5
 
+    async def test_list_metrics_filter_by_ids(self, client, existing_metrics):
+        ids = f"{existing_metrics[0].id},{existing_metrics[1].id}"
+        response = await client.get("/metrics", params={"ids": ids})
+        assert response.status_code == 200
+        assert response.json()["total"] == 2
+
+    async def test_list_metrics_filter_by_ids_not_found(self, client, existing_metrics):
+        response = await client.get("/metrics", params={"ids": "999999999999"})
+        assert response.status_code == 404
+
 
 class TestUpdateMetric:
     async def test_update_metric_all_fields(self, client, existing_metric):

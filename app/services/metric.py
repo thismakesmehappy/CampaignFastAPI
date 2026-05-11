@@ -74,6 +74,15 @@ async def list_metrics(db, pagination: PaginatedFilter = None, campaign_id: int 
     metrics = await metric_repo.find_all(db, pagination, campaign_id, client_id, options)
     total = await metric_repo.count(db, campaign_id, client_id, options)
 
+    # validate ids
+    if options and options.id_list:
+        found_ids = {m.id for m in metrics}
+        errors = NotFoundError()
+        for id_ in options.id_list:
+            if id_ not in found_ids:
+                errors.capture(f"Metric {id_}")
+        errors.raise_if_any()
+
     # merge
     has_more = pagination.offset + len(metrics) < total
     metrics_campaign = PaginatedResponse(items=metrics, total=total, limit=pagination.limit, has_more=has_more, offset=pagination.offset)

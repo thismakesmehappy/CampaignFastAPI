@@ -29,6 +29,9 @@ def _apply_filters(query, options: CampaignFilter | None, client_id: int | None 
     if options.client_name_filter:
         query = query.join(Client, Campaign.client_id == Client.id).where(Client.name.icontains(options.client_name_filter))
 
+    if options.id_list:
+        query = query.where(Campaign.id.in_(options.id_list))
+
     return query
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, options: CampaignFilter = None, client_id: int | None = None) -> list[Campaign]:

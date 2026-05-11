@@ -19,7 +19,10 @@ async def get(db: AsyncSession, client_id: int) -> Client | None:
 def _apply_filters(query, options: ClientFilter | None):
     if options is None:
         options = ClientFilter()
-    return query.where(Client.name.icontains(options.name_filter))
+    query = query.where(Client.name.icontains(options.name_filter))
+    if options.id_list:
+        query = query.where(Client.id.in_(options.id_list))
+    return query
 
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, options: ClientFilter = None) -> list[Client]:

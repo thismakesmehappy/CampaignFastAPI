@@ -50,6 +50,9 @@ def _apply_filters(query, campaign_id: int | None, client_id: int | None, option
     if options.max_impressions is not None:
         query = query.where(Metric.impressions <= options.max_impressions)
 
+    if options.id_list:
+        query = query.where(Metric.id.in_(options.id_list))
+
     return query
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter = None) -> list[Metric]:

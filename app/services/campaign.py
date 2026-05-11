@@ -60,6 +60,15 @@ async def list_campaigns(db, pagination: PaginatedFilter = None, options: Campai
     campaigns_list = await campaign_repo.find_all(db, pagination, options, client_id)
     total = await campaign_repo.count(db, options, client_id)
 
+    # validate ids
+    if options and options.id_list:
+        found_ids = {c.id for c in campaigns_list}
+        errors = NotFoundError()
+        for id_ in options.id_list:
+            if id_ not in found_ids:
+                errors.capture(f"Campaign {id_}")
+        errors.raise_if_any()
+
     # merge
     has_more = pagination.offset + len(campaigns_list) < total
     response = PaginatedResponse(items=campaigns_list, has_more=has_more, total=total, offset=pagination.offset, limit=pagination.limit)
