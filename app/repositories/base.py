@@ -6,6 +6,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.exceptions import DomainValidationError
 
 
+def apply_sort(query, sort_by_list, sort_by_options, desc: str | None, sortable: bool):
+    if not sortable:
+        return query
+
+    for sort in sort_by_list:
+        col = sort_by_options.get(sort)
+        if not col:
+            continue
+        query = query.order_by(col.desc() if desc is not None else col)
+
+    return query
 
 _ID_MIN = 10_000_000_000
 _ID_MAX = 99_999_999_999

@@ -5,7 +5,8 @@ from app.models import Client
 from app.models.campaign import Campaign
 from app.schema import PaginatedFilter
 from app.schema.campaign import CampaignFilter
-from app.repositories.base import save_with_generated_id
+from app.repositories.base import save_with_generated_id, apply_sort
+
 
 async def save(db: AsyncSession, campaign: Campaign) -> Campaign:
     return await save_with_generated_id(db, campaign)
@@ -43,16 +44,13 @@ def _apply_filters(query, options: CampaignFilter | None, client_id: int | None 
     if options.id_list:
         query = query.where(Campaign.id.in_(options.id_list))
 
-    if not sortable:
-        return query
-
-    for sort in options.sort_by_list:
-        col = sort_by_options.get(sort)
-        if not col:
-            continue
-        query = query.order_by(col.desc() if options.desc is not None else col)
-
-    return query
+    return apply_sort(
+        query,
+        options.sort_by_list,
+        sort_by_options,
+        options.desc,
+        sortable
+    )
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, options: CampaignFilter = None, client_id: int | None = None) -> list[Campaign]:
     """Return a paginated list of campaigns. Defaults to first page if no filter provided."""

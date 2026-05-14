@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from app.models.client import Client
 from app.schema import PaginatedFilter
 from app.schema.client import ClientFilter
-from app.repositories.base import save_with_generated_id
+from app.repositories.base import save_with_generated_id, apply_sort
 
 
 async def save(db: AsyncSession, client: Client) -> Client:
@@ -16,19 +16,35 @@ async def get(db: AsyncSession, client_id: int) -> Client | None:
     return result.scalar_one_or_none()
 
 
-def _apply_filters(query, options: ClientFilter | None):
+def _apply_filters(query, options: ClientFilter | None, sortable: bool = False):
+    sort_by_options = {
+        "id": Client.id,
+        "name": Client.name,
+        "email": Client.email,
+        "notes": Client.notes,
+        "is_active": Client.is_active,
+        "created_at": Client.created_at
+    }
+
     if options is None:
         options = ClientFilter()
     query = query.where(Client.name.icontains(options.name_filter))
     if options.id_list:
         query = query.where(Client.id.in_(options.id_list))
-    return query
+    
+    return apply_sort(
+        query,
+        options.sort_by_list,
+        sort_by_options,
+        options.desc,
+        sortable
+    )
 
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, options: ClientFilter = None) -> list[Client]:
     if data is None:
         data = PaginatedFilter()
-    query = _apply_filters(select(Client), options).offset(data.offset).limit(data.limit)
+    query = _apply_filters(select(Client), options, sortable=True).offset(data.offset).limit(data.limit)
     result = await db.execute(query)
     return list(result.scalars().all())
 
