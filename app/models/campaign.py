@@ -16,7 +16,7 @@ class Campaign(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String(CAMPAIGN_NAME_MAX_LENGTH))
     client_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("clients.id"), nullable=False)
-    created_at: Mapped[DateTime] = mapped_column(DateTime, server_default=func.now())
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     client: Mapped["Client"] = relationship(back_populates="campaigns")
     metrics: Mapped[list["Metric"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
 

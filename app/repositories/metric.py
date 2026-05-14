@@ -5,7 +5,7 @@ from app.models import Metric, Client
 from app.schema import MetricBase, PaginatedFilter
 from app.models import Campaign
 from app.schema.metric import MetricFilter
-from app.repositories.base import save_with_generated_id
+from app.repositories.base import save_with_generated_id, apply_sort
 
 
 async def save(db: AsyncSession, metric: Metric) -> Metric:
@@ -17,21 +17,36 @@ async def get(db: AsyncSession, metric_id: int) -> Metric | None:
     metric = result.scalar_one_or_none()
     return metric
 
-def _apply_filters(query, campaign_id: int | None, client_id: int | None, options: MetricFilter | None):
+def _apply_filters(query, campaign_id: int | None, client_id: int | None, options: MetricFilter | None, sortable: bool = False):
+    sort_by_options = {
+        "client_name": Client.name,
+        "campaign_name": Campaign.name,
+        "impressions": Metric.impressions,
+        "clicks": Metric.clicks,
+        "spend": Metric.spend,
+        "period_start": Metric.period_start,
+        "period_end": Metric.period_end,
+        "id": Metric.id,
+        "created_at": Metric.created_at,
+    }
+
     if options is None:
         options = MetricFilter()
     if campaign_id is not None:
         query = query.where(Metric.campaign_id == campaign_id)
 
-    needs_campaign_join = client_id is not None or options.campaign_name_filter or options.client_name_filter
+    needs_campaign_join = client_id is not None or options.campaign_name_filter or options.client_name_filter or "client_name" in options.sort_by_list or "campaign_name" in options.sort_by_list
     if needs_campaign_join:
         query = query.join(Campaign, Metric.campaign_id == Campaign.id)
     if client_id is not None:
         query = query.where(Campaign.client_id == client_id)
     if options.campaign_name_filter:
         query = query.where(Campaign.name.icontains(options.campaign_name_filter))
+    needs_client_join = options.client_name_filter or "client_name" in options.sort_by_list
+    if needs_client_join:
+        query = query.join(Client, Campaign.client_id == Client.id)
     if options.client_name_filter:
-        query = query.join(Client, Campaign.client_id == Client.id).where(Client.name.icontains(options.client_name_filter))
+        query = query.where(Client.name.icontains(options.client_name_filter))
 
     if options.period_start is not None:
         query = query.where(Metric.period_start >= options.period_start)
@@ -53,7 +68,13 @@ def _apply_filters(query, campaign_id: int | None, client_id: int | None, option
     if options.id_list:
         query = query.where(Metric.id.in_(options.id_list))
 
-    return query
+    return apply_sort(
+        query,
+        options.sort_by_list,
+        sort_by_options,
+        options.desc,
+        sortable
+    )
 
 async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter = None) -> list[Metric]:
     """
@@ -63,7 +84,7 @@ async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: 
     if data is None:
         data = PaginatedFilter()
 
-    query = _apply_filters(select(Metric), campaign_id, client_id, options)
+    query = _apply_filters(select(Metric), campaign_id, client_id, options, True)
     result = await db.execute(query.offset(data.offset).limit(data.limit))
     metrics = result.scalars().all()
     return list(metrics)

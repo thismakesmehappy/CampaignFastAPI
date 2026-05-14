@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.campaign import Campaign
 
-from sqlalchemy import DateTime, Float, ForeignKey, BigInteger
+from sqlalchemy import DateTime, Float, ForeignKey, BigInteger, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base
@@ -13,6 +13,7 @@ from datetime import datetime
 
 class Metric(Base):
     __tablename__ = "metrics"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     campaign_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("campaigns.id"))
     impressions: Mapped[int]

@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Any
+
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 class MetricBase(BaseModel):
@@ -30,6 +33,7 @@ class MetricRead(MetricCreate):
     """Response body for any endpoint returning a single metric. Deserializes from ORM via from_attributes."""
     id: int
     campaign_id: int
+    created_at: datetime
     model_config = {"from_attributes": True}
 
 class MetricSummary(MetricBase):
@@ -40,10 +44,6 @@ class MetricFilter(BaseModel):
     campaign_name_filter: str = ""
     client_name_filter: str = ""
     ids: str = ""
-
-    @property
-    def id_list(self) -> list[int]:
-        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
     period_start: AwareDatetime | None  = None
     period_end: AwareDatetime | None = None
     min_spend: float | None = None
@@ -52,3 +52,13 @@ class MetricFilter(BaseModel):
     max_clicks: int | None = None
     min_impressions: int | None = None
     max_impressions: int | None = None
+    sort_by: str = ""
+    desc: str | None = None
+
+    @property
+    def id_list(self) -> list[int]:
+        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
+
+    @property
+    def sort_by_list(self) -> list[int] | list[Any]:
+        return [i.strip() for i in self.sort_by.split(",")] if self.sort_by else []
