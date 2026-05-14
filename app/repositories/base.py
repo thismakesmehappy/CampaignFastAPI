@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import DomainValidationError
 
+
+
 _ID_MIN = 10_000_000_000
 _ID_MAX = 99_999_999_999
 _MAX_RETRIES = 3

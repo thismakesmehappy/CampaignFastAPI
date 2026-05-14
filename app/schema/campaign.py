@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from app.constants import (
@@ -27,7 +29,13 @@ class CampaignFilter(BaseModel):
     name_filter: str = ""
     client_name_filter: str = ""
     ids: str = ""
+    sort_by: str = ""
+    desc: str | None = None
 
     @property
     def id_list(self) -> list[int]:
         return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
+
+    @property
+    def sort_by_list(self) -> list[int] | list[Any]:
+        return [i.strip() for i in self.sort_by.split(",")] if self.sort_by else []
