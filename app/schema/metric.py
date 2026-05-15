@@ -59,6 +59,10 @@ class MetricSummaryFilter(BaseModel):
     def sort_by_list(self) -> list[int] | list[Any]:
         return [i.strip() for i in self.sort_by.split(",")] if self.sort_by else []
 
+class MetricSummaryList(BaseModel):
+    resource_type: str = ""
+    summaries: list[MetricSummaryWithId]
+
 
 class MetricFilter(MetricSummaryFilter):
     campaign_name_filter: str = ""

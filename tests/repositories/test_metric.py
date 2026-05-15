@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from app.repositories import metric as metric_repo
 from app.schema import PaginatedFilter
-from app.schema.metric import MetricFilter
+from app.schema.metric import MetricFilter, MetricSummaryFilter
 from tests.conftest import (
     TEST_METRICS_MULTI as TEST_METRICS,
     SUMMARY_TOTAL_CLICKS,
@@ -379,72 +379,36 @@ class TestMetricsSummary:
         assert summary.spend == 0
         assert summary.impressions == 0
         
-    async def test_summarize_for_campaign(self, db_session, existing_metrics_single_campaign):
-        campaign_id = existing_metrics_single_campaign.id
-        summary = await metric_repo.summarize(db_session, campaign_id)
-        assert summary
-        assert summary.clicks == SUMMARY_TOTAL_CLICKS
-        assert summary.spend == SUMMARY_TOTAL_SPEND
-        assert summary.impressions == SUMMARY_TOTAL_IMPRESSIONS
-
-    async def test_summarize_for_campaign_no_entries(self, db_session, make_campaign):
-        campaign = await make_campaign()
-        campaign_id = campaign.id
-        summary = await metric_repo.summarize(db_session, campaign_id)
-        assert summary
-        assert summary.clicks == 0
-        assert summary.spend == 0
-        assert summary.impressions == 0
-
-    async def test_summarize_for_campaign_only_shows_campaigns_results(self, db_session, existing_metrics_across_campaigns):
-        metric = existing_metrics_across_campaigns['metrics'][0]
-        campaign_id = metric.campaign_id
-        summary = await metric_repo.summarize(db_session, campaign_id)
-        assert summary
-        assert summary.clicks == metric.clicks
-        assert summary.spend == metric.spend
-        assert summary.impressions == metric.impressions
-
     async def test_summarize_filter_by_min_spend(self, db_session, existing_metric_list):
-        # spend=i*10 for i in 1..12; spend>=50 means i>=5: spend sum=50+60+...+120=780, clicks=25+30+...+60=340, impressions=500+...+1200=7800 (but default limit 10 doesn't apply to summarize)
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(min_spend=50.0))
+        # spend=i*10 for i in 1..12; spend>=50 means i>=5
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(min_spend=50.0))
         assert summary.spend == sum(i * 10 for i in range(5, 13))
         assert summary.clicks == sum(i * 5 for i in range(5, 13))
         assert summary.impressions == sum(i * 100 for i in range(5, 13))
 
     async def test_summarize_filter_by_max_spend(self, db_session, existing_metric_list):
         # spend<=50 means i<=5
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(max_spend=50.0))
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(max_spend=50.0))
         assert summary.spend == sum(i * 10 for i in range(1, 6))
         assert summary.clicks == sum(i * 5 for i in range(1, 6))
         assert summary.impressions == sum(i * 100 for i in range(1, 6))
 
     async def test_summarize_filter_by_spend_range(self, db_session, existing_metric_list):
         # spend between 20 and 60 means i in 2..6
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(min_spend=20.0, max_spend=60.0))
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(min_spend=20.0, max_spend=60.0))
         assert summary.spend == sum(i * 10 for i in range(2, 7))
 
     async def test_summarize_filter_by_period_range(self, db_session, existing_metric_list):
         # i>=3 and i<=8 means i in 3..8
         after = datetime(2026, 1, 3, tzinfo=timezone.utc)
         before = datetime(2026, 1, 8, tzinfo=timezone.utc)
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(period_start=after, period_end=before))
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(period_start=after, period_end=before))
         assert summary.spend == sum(i * 10 for i in range(3, 9))
         assert summary.clicks == sum(i * 5 for i in range(3, 9))
         assert summary.impressions == sum(i * 100 for i in range(3, 9))
 
-    async def test_summarize_filter_by_campaign_name(self, db_session, existing_metrics_for_campaign_filter):
-        # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(campaign_name_filter="Test"))
-        assert round(summary.spend, 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
-
-    async def test_summarize_filter_by_campaign_name_and_client(self, db_session, existing_metrics_for_campaign_filter):
-        # name="Test" AND client="Acme" matches 3 campaigns: spend=1.1+2.2+3.3=6.6
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(campaign_name_filter="Test", client_name_filter="Acme"))
-        assert round(summary.spend, 2) == round(1.1 + 2.2 + 3.3, 2)
-
     async def test_summarize_filter_no_match(self, db_session, existing_metric_list):
-        summary = await metric_repo.summarize(db_session, options=MetricFilter(min_spend=9999.0))
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(min_spend=9999.0))
         assert summary.spend == 0
         assert summary.clicks == 0
         assert summary.impressions == 0

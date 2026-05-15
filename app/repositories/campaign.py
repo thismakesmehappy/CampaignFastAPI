@@ -70,3 +70,8 @@ async def delete(db: AsyncSession, campaign: Campaign) -> None:
     """Delete a campaign by id. Returns True if deleted, False if not found."""
     await db.delete(campaign)
     await db.commit()
+
+async def find_ids(db: AsyncSession, ids: list[int]) -> list[int]:
+    query = select(Campaign.id).where(Campaign.id.in_(ids))
+    result = await db.execute(query)
+    return list(result.scalars().all())

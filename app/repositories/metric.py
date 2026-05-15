@@ -99,22 +99,23 @@ async def find_all(db: AsyncSession, data: PaginatedFilter = None, campaign_id: 
     metrics = result.scalars().all()
     return list(metrics)
 
-async def count(db: AsyncSession, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> int:
+async def count(db: AsyncSession, campaign_id: int | None = None, client_id: int | None = None, options: MetricSummaryFilter | None = None) -> int:
     """
     Return the total number of metric across all pages.
     If campaign_id is provided, limit count to metrics for that specific campaign.
     """
-    query = _apply_relational_filters(select(func.count()).select_from(Metric), campaign_id, client_id, options)
+    full_options = MetricFilter.model_validate(options.model_dump()) if options else None
+    query = _apply_relational_filters(select(func.count()).select_from(Metric), campaign_id, client_id, full_options)
     count = await db.execute(query)
     return int(count.scalar() or 0)
 
-async def summarize(db: AsyncSession, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> MetricBase:
+async def summarize(db: AsyncSession, options: MetricSummaryFilter | None = None) -> MetricBase:
     query = select(
         func.sum(Metric.clicks).label("clicks"),
         func.sum(Metric.impressions).label("impressions"),
         func.sum(Metric.spend).label("spend"),
     ).select_from(Metric)
-    query = _apply_relational_filters(query, campaign_id, client_id, options)
+    query = _apply_filters(query, options)
     result = await db.execute(query)
     row = result.one()
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)
@@ -136,7 +137,7 @@ async def summarize_by_campaigns(db: AsyncSession, campaign_ids: list[int], opti
     return [MetricSummaryWithId.model_validate(row) for row in result.all()]
 
 
-async def summarize_by_clients(db: AsyncSession, client_ids: list[int], options: MetricSummaryFilter) -> list[MetricSummaryWithId]:
+async def summarize_by_clients(db: AsyncSession, client_ids: list[int], options: MetricSummaryFilter = None) -> list[MetricSummaryWithId]:
     query = (
         select(
             Campaign.client_id.label("id"),

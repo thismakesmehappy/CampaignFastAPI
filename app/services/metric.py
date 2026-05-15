@@ -9,7 +9,11 @@ from app.schema import (
     MetricUpdate,
     MetricCreate,
 )
-from app.schema.metric import MetricFilter
+from app.schema.metric import (
+    MetricFilter,
+    MetricSummaryFilter,
+    MetricSummaryList,
+)
 
 
 async def create(db, campaign_id: int, data: MetricCreate) -> Metric:
@@ -110,14 +114,74 @@ async def list_metrics_summary(db, campaign_id: int | None = None, client_id: in
     errors.raise_if_any()
 
     # fetch_metrics_summary
-    aggregates = await metric_repo.summarize(db, campaign_id, client_id, options)
-    total = await metric_repo.count(db, campaign_id, client_id, options)
+    aggregates = await metric_repo.summarize(db, options=options)
+    total = await metric_repo.count(db, options=options)
 
     # merge
-    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total, campaign_id=campaign_id)
+    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total)
 
     # persist
     #return
+    return result
+
+async def metrics_summary(db, options: MetricSummaryFilter | None = None) -> MetricSummary:
+    # validate_input
+    # fetch
+    aggregates = await metric_repo.summarize(db, options=options)
+    total = await metric_repo.count(db, options=options)
+    # validate
+
+    # merge
+    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total)
+
+    # persist
+    # return
+    return result
+
+async def metrics_summary_for_campaigns(db, campaign_ids: list[int], options: MetricSummaryFilter | None = None) -> MetricSummaryList:
+    # validate_input
+    # fetch
+    found = await campaign_repo.find_ids(db, campaign_ids)
+
+    # validate
+    if len(found) < len(campaign_ids):
+        errors = NotFoundError()
+        for id_ in campaign_ids:
+            if id_ not in found:
+                errors.capture(f"Campaign {id_}")
+        errors.raise_if_any()
+
+    # fetch_metrics_summary_for_campaigns
+    summaries = await metric_repo.summarize_by_campaigns(db, campaign_ids, options)
+
+    # merge
+    result = MetricSummaryList(resource_type="campaign", summaries=summaries)
+
+    # persist
+    # return
+    return result
+
+async def metrics_summary_for_clients(db, client_ids: list[int], options: MetricSummaryFilter | None = None) -> MetricSummaryList:
+    # validate_input
+    # fetch
+    found = await client_repo.find_ids(db, client_ids)
+
+    # validate
+    if len(found) < len(client_ids):
+        errors = NotFoundError()
+        for id_ in client_ids:
+            if id_ not in found:
+                errors.capture(f"Client {id_}")
+        errors.raise_if_any()
+
+    # fetch_metrics_summary_for_campaigns
+    summaries = await metric_repo.summarize_by_clients(db, client_ids, options)
+
+    # merge
+    result = MetricSummaryList(resource_type="client", summaries=summaries)
+
+    # persist
+    # return
     return result
 
 async def update(db, metric_id: int, data: MetricUpdate) -> Metric:

@@ -58,3 +58,8 @@ async def count(db: AsyncSession, options: ClientFilter = None) -> int:
 async def delete(db: AsyncSession, client: Client) -> None:
     await db.delete(client)
     await db.commit()
+
+async def find_ids(db: AsyncSession, ids: list[int]) -> list[int]:
+    query = select(Client.id).where(Client.id.in_(ids))
+    result = await db.execute(query)
+    return list(result.scalars().all())
