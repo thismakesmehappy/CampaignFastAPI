@@ -449,6 +449,52 @@ class TestMetricsSummary:
         assert summary.clicks == 0
         assert summary.impressions == 0
 
+class TestSummarizeByGroups:
+    async def test_summarize_by_campaigns(self, db_session, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
+        summaries = await metric_repo.summarize_by_campaigns(db_session, campaign_ids)
+        assert len(summaries) == len(campaign_ids)
+        result_ids = {s.id for s in summaries}
+        assert result_ids == set(campaign_ids)
+        for summary in summaries:
+            matching = next(m for m in existing_metrics_across_campaigns["metrics"] if m.campaign_id == summary.id)
+            assert summary.clicks == matching.clicks
+            assert summary.spend == matching.spend
+            assert summary.impressions == matching.impressions
+            assert summary.total_metrics == 1
+
+    async def test_summarize_by_campaigns_aggregates(self, db_session, existing_metrics_single_campaign):
+        campaign_id = existing_metrics_single_campaign.id
+        summaries = await metric_repo.summarize_by_campaigns(db_session, [campaign_id])
+        assert len(summaries) == 1
+        assert summaries[0].clicks == SUMMARY_TOTAL_CLICKS
+        assert summaries[0].spend == SUMMARY_TOTAL_SPEND
+        assert summaries[0].impressions == SUMMARY_TOTAL_IMPRESSIONS
+        assert summaries[0].total_metrics == len(TEST_METRICS)
+
+    async def test_summarize_by_campaigns_empty(self, db_session, existing_metrics_across_campaigns):
+        summaries = await metric_repo.summarize_by_campaigns(db_session, [999999999999])
+        assert len(summaries) == 0
+
+    async def test_summarize_by_clients(self, db_session, existing_metrics_for_campaign_filter):
+        # existing_metrics_for_campaign_filter has two clients: Acme (4 metrics) and Other Client (1 metric)
+        campaign_ids = existing_metrics_for_campaign_filter["campaign_ids"]
+        # get client ids via campaign_ids — use the repo's join logic by querying all campaigns
+        from app.models import Campaign
+        from sqlalchemy import select
+        result = await db_session.execute(select(Campaign).where(Campaign.id.in_(campaign_ids)))
+        campaigns = result.scalars().all()
+        client_ids = list({c.client_id for c in campaigns})
+        summaries = await metric_repo.summarize_by_clients(db_session, client_ids)
+        assert len(summaries) == len(client_ids)
+        result_ids = {s.id for s in summaries}
+        assert result_ids == set(client_ids)
+
+    async def test_summarize_by_clients_empty(self, db_session, existing_metrics_across_campaigns):
+        summaries = await metric_repo.summarize_by_clients(db_session, [999999999999])
+        assert len(summaries) == 0
+
+
 class TestDeleteMetric:
     async def test_delete_metric(self, db_session, existing_metric):
         metric_id = existing_metric.id

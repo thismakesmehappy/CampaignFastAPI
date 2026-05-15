@@ -8,6 +8,7 @@ class MetricBase(BaseModel):
     impressions: int = Field(..., ge=0)
     clicks: int = Field(..., ge=0)
     spend: float = Field(..., ge=0)
+    model_config = {"from_attributes": True}
 
 class MetricCreate(MetricBase):
     period_start: AwareDatetime
@@ -38,12 +39,11 @@ class MetricRead(MetricCreate):
 
 class MetricSummary(MetricBase):
     total_metrics: int = Field(..., ge=0)
-    campaign_id: int | None = Field(None)
 
-class MetricFilter(BaseModel):
-    campaign_name_filter: str = ""
-    client_name_filter: str = ""
-    ids: str = ""
+class MetricSummaryWithId(MetricSummary):
+    id: int = Field(..., ge=0)
+
+class MetricSummaryFilter(BaseModel):
     period_start: AwareDatetime | None  = None
     period_end: AwareDatetime | None = None
     min_spend: float | None = None
@@ -56,9 +56,15 @@ class MetricFilter(BaseModel):
     desc: str | None = None
 
     @property
-    def id_list(self) -> list[int]:
-        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
-
-    @property
     def sort_by_list(self) -> list[int] | list[Any]:
         return [i.strip() for i in self.sort_by.split(",")] if self.sort_by else []
+
+
+class MetricFilter(MetricSummaryFilter):
+    campaign_name_filter: str = ""
+    client_name_filter: str = ""
+    ids: str = ""
+
+    @property
+    def id_list(self) -> list[int]:
+        return [int(i) for i in self.ids.split(",") if i.strip()] if self.ids else []
