@@ -193,7 +193,8 @@ async def existing_metrics_for_campaign_filter(db_session, make_metric, make_cam
     metric = await make_metric(campaign.id, spend=5.5, clicks=5, impressions=50)
     metrics.append(metric)
     campaign_ids.append(campaign.id)
-    return {"metrics": metrics, "campaign_ids": campaign_ids}
+    client_ids = [acme.id, other_client.id]
+    return {"metrics": metrics, "campaign_ids": campaign_ids, "client_ids": client_ids}
 
 CAMPAIGN_LIST_NAMES = [
     ("Test Campaign Name One", "Test Campaign Client One"),

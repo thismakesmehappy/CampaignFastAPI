@@ -40,6 +40,9 @@ def _apply_filters(query, options: MetricSummaryFilter | MetricFilter | None, so
     if needs_client_join:
         query = query.join(Client, Campaign.client_id == Client.id)
 
+    if isinstance(options, MetricFilter) and options.id_list:
+        query = query.where(Metric.id.in_(options.id_list))
+
     if options.period_start is not None:
         query = query.where(Metric.period_start >= options.period_start)
     if options.period_end is not None:
@@ -109,13 +112,15 @@ async def count(db: AsyncSession, campaign_id: int | None = None, client_id: int
     count = await db.execute(query)
     return int(count.scalar() or 0)
 
-async def summarize(db: AsyncSession, options: MetricSummaryFilter | None = None) -> MetricBase:
+async def summarize(db: AsyncSession, options: MetricSummaryFilter | None = None, ids: list[int] = None) -> MetricBase:
     query = select(
         func.sum(Metric.clicks).label("clicks"),
         func.sum(Metric.impressions).label("impressions"),
         func.sum(Metric.spend).label("spend"),
     ).select_from(Metric)
     query = _apply_filters(query, options)
+    if ids is not None:
+        query = query.where(Metric.id.in_(ids))
     result = await db.execute(query)
     row = result.one()
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)
@@ -158,3 +163,8 @@ async def delete(db: AsyncSession, metric: Metric) -> None:
     """Delete a metric by id. Returns True if deleted, False if not found."""
     await db.delete(metric)
     await db.commit()
+
+async def find_ids(db: AsyncSession, ids: list[int]) -> list[int]:
+    query = select(Metric.id).where(Metric.id.in_(ids))
+    result = await db.execute(query)
+    return list(result.scalars().all())

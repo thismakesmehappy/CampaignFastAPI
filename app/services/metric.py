@@ -95,41 +95,24 @@ async def list_metrics(db, pagination: PaginatedFilter = None, campaign_id: int 
     # return
     return metrics_campaign
 
-async def list_metrics_summary(db, campaign_id: int | None = None, client_id: int | None = None, options: MetricFilter | None = None) -> MetricSummary:
+async def metrics_summary(db, ids: str = "", options: MetricSummaryFilter | None = None) -> MetricSummary:
     # validate_input
-    # fetch
-    campaign = None
-    if campaign_id is not None:
-        campaign = await campaign_repo.get(db, campaign_id)
-    client = None
-    if client_id is not None:
-        client = await client_repo.get(db, client_id)
+    metric_ids = [int(i) for i in ids.split(",") if i.strip()] if ids else []
 
-    # validate
-    errors = NotFoundError()
-    if campaign_id is not None and campaign is None:
-        errors.capture("Campaign")
-    if client_id is not None and client is None:
-        errors.capture("Client")
-    errors.raise_if_any()
+    # fetch / validate ids if provided
+    if metric_ids:
+        found = await metric_repo.find_ids(db, metric_ids)
+        if len(found) < len(metric_ids):
+            errors = NotFoundError()
+            for id_ in metric_ids:
+                if id_ not in found:
+                    errors.capture(f"Metric {id_}")
+            errors.raise_if_any()
 
     # fetch_metrics_summary
-    aggregates = await metric_repo.summarize(db, options=options)
-    total = await metric_repo.count(db, options=options)
-
-    # merge
-    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total)
-
-    # persist
-    #return
-    return result
-
-async def metrics_summary(db, options: MetricSummaryFilter | None = None) -> MetricSummary:
-    # validate_input
-    # fetch
-    aggregates = await metric_repo.summarize(db, options=options)
-    total = await metric_repo.count(db, options=options)
-    # validate
+    count_options = MetricFilter(**(options.model_dump() if options else {}), ids=ids) if metric_ids else options
+    aggregates = await metric_repo.summarize(db, options=options, ids=metric_ids or None)
+    total = await metric_repo.count(db, options=count_options)
 
     # merge
     result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total)
@@ -138,8 +121,14 @@ async def metrics_summary(db, options: MetricSummaryFilter | None = None) -> Met
     # return
     return result
 
-async def metrics_summary_for_campaigns(db, campaign_ids: list[int], options: MetricSummaryFilter | None = None) -> MetricSummaryList:
+async def metrics_summary_for_campaigns(db, ids: str, options: MetricSummaryFilter | None = None) -> MetricSummaryList:
     # validate_input
+    errors = DomainValidationError()
+    if not ids:
+        errors.capture("ids URL parameters must be non-empty")
+    errors.raise_if_any()
+    campaign_ids = [int(i) for i in ids.split(",")]
+
     # fetch
     found = await campaign_repo.find_ids(db, campaign_ids)
 
@@ -161,8 +150,14 @@ async def metrics_summary_for_campaigns(db, campaign_ids: list[int], options: Me
     # return
     return result
 
-async def metrics_summary_for_clients(db, client_ids: list[int], options: MetricSummaryFilter | None = None) -> MetricSummaryList:
+async def metrics_summary_for_clients(db, ids: str, options: MetricSummaryFilter | None = None) -> MetricSummaryList:
     # validate_input
+    errors = DomainValidationError()
+    if not ids:
+        errors.capture("ids URL parameters must be non-empty")
+    errors.raise_if_any()
+    client_ids = [int(i) for i in ids.split(",")]
+
     # fetch
     found = await client_repo.find_ids(db, client_ids)
 
@@ -174,7 +169,7 @@ async def metrics_summary_for_clients(db, client_ids: list[int], options: Metric
                 errors.capture(f"Client {id_}")
         errors.raise_if_any()
 
-    # fetch_metrics_summary_for_campaigns
+    # fetch_metrics_summary_for_clients
     summaries = await metric_repo.summarize_by_clients(db, client_ids, options)
 
     # merge

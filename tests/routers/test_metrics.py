@@ -1,4 +1,3 @@
-import pytest
 from app.constants import PAGE_LIMIT_DEFAULT
 from tests.conftest import (
     TEST_METRIC,
@@ -317,14 +316,12 @@ class TestListMetrics:
         assert data["total"] == 5
         assert len(data["items"]) == 5
 
-    @pytest.mark.skip(reason="ids filter not yet wired in repo layer — fix with route refactor")
     async def test_list_metrics_filter_by_ids(self, client, existing_metrics):
         ids = f"{existing_metrics[0].id},{existing_metrics[1].id}"
         response = await client.get("/metrics", params={"ids": ids})
         assert response.status_code == 200
         assert response.json()["total"] == 2
 
-    @pytest.mark.skip(reason="ids filter not yet wired in repo layer — fix with route refactor")
     async def test_list_metrics_filter_by_ids_not_found(self, client, existing_metrics):
         response = await client.get("/metrics", params={"ids": "999999999999"})
         assert response.status_code == 404
@@ -416,50 +413,74 @@ class TestDeleteMetric:
         assert response.status_code == 404
 
 
-@pytest.mark.skip(reason="endpoint shape changing in route refactor — campaign_id removed from MetricSummary")
-class TestGetMetricsSummaryForCampaign:
-    async def test_summary_for_campaign(self, client, existing_metrics_single_campaign):
+class TestGetMetricsSummaryForCampaigns:
+    async def test_summary_for_campaigns(self, client, existing_metrics_across_campaigns):
+        campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
+        ids_param = ",".join(str(i) for i in campaign_ids)
+        response = await client.get(f"/campaigns/metrics/summary?ids={ids_param}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["resource_type"] == "campaign"
+        assert len(data["summaries"]) == len(campaign_ids)
+        assert {s["id"] for s in data["summaries"]} == set(campaign_ids)
+
+    async def test_summary_for_campaigns_aggregates(self, client, existing_metrics_single_campaign):
         campaign_id = existing_metrics_single_campaign.id
-        response = await client.get(f"/campaigns/{campaign_id}/metrics/summary")
+        response = await client.get(f"/campaigns/metrics/summary?ids={campaign_id}")
         assert response.status_code == 200
         data = response.json()
-        assert data["clicks"] == SUMMARY_TOTAL_CLICKS
-        assert data["spend"] == SUMMARY_TOTAL_SPEND
-        assert data["impressions"] == SUMMARY_TOTAL_IMPRESSIONS
-        assert data["total_metrics"] == len(TEST_METRICS_MULTI)
-        assert data["campaign_id"] == campaign_id
+        summary = data["summaries"][0]
+        assert summary["clicks"] == SUMMARY_TOTAL_CLICKS
+        assert summary["spend"] == SUMMARY_TOTAL_SPEND
+        assert summary["impressions"] == SUMMARY_TOTAL_IMPRESSIONS
+        assert summary["total_metrics"] == len(TEST_METRICS_MULTI)
 
-    async def test_summary_for_campaign_no_entries(self, client, existing_campaign):
-        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics/summary")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["clicks"] == 0
-        assert data["spend"] == 0
-        assert data["impressions"] == 0
-        assert data["total_metrics"] == 0
-        assert data["campaign_id"] == existing_campaign.id
-
-    async def test_summary_for_campaign_not_found(self, client, existing_campaign):
+    async def test_summary_for_campaigns_not_found(self, client, existing_campaign):
         fake_id = existing_campaign.id + 1
-        response = await client.get(f"/campaigns/{fake_id}/metrics/summary")
+        response = await client.get(f"/campaigns/metrics/summary?ids={fake_id}")
         assert response.status_code == 404
 
-    async def test_summary_for_campaign_only_shows_own_metrics(self, client, existing_metrics_across_campaigns):
+    async def test_summary_for_campaigns_only_shows_own_metrics(self, client, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         metrics = existing_metrics_across_campaigns["metrics"]
         target_id = campaign_ids[0]
-        response = await client.get(f"/campaigns/{target_id}/metrics/summary")
+        response = await client.get(f"/campaigns/metrics/summary?ids={target_id}")
         assert response.status_code == 200
         data = response.json()
-        assert data["clicks"] == metrics[0].clicks
-        assert data["spend"] == metrics[0].spend
-        assert data["impressions"] == metrics[0].impressions
-        assert data["total_metrics"] == 1
-        assert data["campaign_id"] == target_id
+        summary = data["summaries"][0]
+        assert summary["clicks"] == metrics[0].clicks
+        assert summary["spend"] == metrics[0].spend
+        assert summary["impressions"] == metrics[0].impressions
+        assert summary["total_metrics"] == 1
+
+    async def test_summary_for_campaigns_ids_required(self, client, existing_campaign):
+        response = await client.get("/campaigns/metrics/summary")
+        assert response.status_code == 422
+
+
+class TestGetMetricsSummaryForClients:
+    async def test_summary_for_clients(self, client, existing_metrics_for_campaign_filter):
+        # fixture has 2 clients; get their ids from the returned campaign_ids via the campaigns
+        client_ids = existing_metrics_for_campaign_filter["client_ids"]
+        ids_param = ",".join(str(i) for i in client_ids)
+        response = await client.get(f"/clients/metrics/summary?ids={ids_param}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["resource_type"] == "client"
+        assert len(data["summaries"]) == len(client_ids)
+        assert {s["id"] for s in data["summaries"]} == set(client_ids)
+
+    async def test_summary_for_clients_not_found(self, client, existing_client):
+        fake_id = existing_client.id + 1
+        response = await client.get(f"/clients/metrics/summary?ids={fake_id}")
+        assert response.status_code == 404
+
+    async def test_summary_for_clients_ids_required(self, client):
+        response = await client.get("/clients/metrics/summary")
+        assert response.status_code == 422
 
 
 class TestGetMetricsSummary:
-    @pytest.mark.skip(reason="campaign_id removed from MetricSummary response — fix with route refactor")
     async def test_summary(self, client, existing_metrics_across_campaigns):
         response = await client.get("/metrics/summary")
         assert response.status_code == 200
@@ -468,9 +489,7 @@ class TestGetMetricsSummary:
         assert data["spend"] == SUMMARY_TOTAL_SPEND
         assert data["impressions"] == SUMMARY_TOTAL_IMPRESSIONS
         assert data["total_metrics"] == len(TEST_METRICS_MULTI)
-        assert data["campaign_id"] is None
 
-    @pytest.mark.skip(reason="campaign_id removed from MetricSummary response — fix with route refactor")
     async def test_summary_no_entries(self, client):
         response = await client.get("/metrics/summary")
         assert response.status_code == 200
@@ -479,16 +498,6 @@ class TestGetMetricsSummary:
         assert data["spend"] == 0
         assert data["impressions"] == 0
         assert data["total_metrics"] == 0
-        assert data["campaign_id"] is None
-
-    @pytest.mark.skip(reason="campaign_name_filter removed from /metrics/summary — fix with route refactor")
-    async def test_summary_filter_by_campaign_name(self, client, existing_metrics_for_campaign_filter):
-        # "Test" matches 4 campaigns: spend=1.1+2.2+3.3+5.5=12.1
-        response = await client.get("/metrics/summary?campaign_name_filter=Test")
-        assert response.status_code == 200
-        data = response.json()
-        assert round(data["spend"], 2) == round(1.1 + 2.2 + 3.3 + 5.5, 2)
-        assert data["total_metrics"] == 4
 
     async def test_summary_filter_by_spend_range(self, client, existing_metric_list):
         # spend between 20 and 60 means i in 2..6, so 5 results
@@ -504,3 +513,14 @@ class TestGetMetricsSummary:
         data = response.json()
         assert data["spend"] == 0
         assert data["total_metrics"] == 0
+
+    async def test_summary_filter_by_ids(self, client, existing_metrics):
+        ids = f"{existing_metrics[0].id},{existing_metrics[1].id}"
+        response = await client.get(f"/metrics/summary?ids={ids}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_metrics"] == 2
+
+    async def test_summary_filter_by_ids_not_found(self, client, existing_metrics):
+        response = await client.get("/metrics/summary?ids=999999999999")
+        assert response.status_code == 404
