@@ -29,7 +29,11 @@ app = FastAPI(
     title="Campaign Tracker API",
     description="API for managing advertising campaigns and their performance metrics.",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    servers=[
+        {"url": "http://campaignfastapi.onrender.com/", "description": "Production server"},
+        {"url": "http://localhost:8000", "description": "Local dev"}
+    ]
 )
 
 app.include_router(campaigns.router, dependencies=[Depends(require_api_key)])
