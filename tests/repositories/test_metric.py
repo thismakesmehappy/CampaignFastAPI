@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from app.repositories import metric as metric_repo
 from app.schema import PaginatedFilter
 from app.schema.metric import MetricFilter, MetricSummaryFilter
+from app.models.metric import MetricSource
 from tests.conftest import (
     TEST_METRICS_MULTI as TEST_METRICS,
     SUMMARY_TOTAL_CLICKS,
@@ -279,6 +280,43 @@ class TestFindAllMetrics:
             assert metric.period_start >= after
             assert metric.period_end <= before
 
+    async def test_filter_by_source_user(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        result = await metric_repo.find_all(db_session, options=MetricFilter(source=MetricSource.user))
+        assert len(result) == 1
+        assert result[0].source == MetricSource.user
+
+    async def test_filter_by_source_system(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        result = await metric_repo.find_all(db_session, options=MetricFilter(source=MetricSource.system))
+        assert len(result) == 1
+        assert result[0].source == MetricSource.system
+
+    async def test_filter_by_source_comma_separated(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        result = await metric_repo.find_all(db_session, options=MetricFilter(source="user,system"))
+        assert len(result) == 2
+
+    async def test_filter_by_source_all_keyword(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        result = await metric_repo.find_all(db_session, options=MetricFilter(source="all"))
+        assert len(result) == 2
+
+    async def test_filter_by_source_unset_returns_all(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        result = await metric_repo.find_all(db_session, options=MetricFilter())
+        assert len(result) == 2
+
 
 class TestCountMetrics:
     async def test_count_metrics_with_entries(self, db_session, existing_metrics_across_campaigns):
@@ -413,6 +451,15 @@ class TestMetricsSummary:
         assert summary.clicks == 0
         assert summary.impressions == 0
 
+    async def test_summarize_filter_by_source(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, spend=10.0, clicks=1, impressions=100, source=MetricSource.user)
+        await make_metric(campaign.id, spend=20.0, clicks=2, impressions=200, source=MetricSource.system)
+        summary = await metric_repo.summarize(db_session, options=MetricSummaryFilter(source="system"))
+        assert summary.spend == 20.0
+        assert summary.clicks == 2
+        assert summary.impressions == 200
+
 class TestSummarizeByGroups:
     async def test_summarize_by_campaigns(self, db_session, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
@@ -440,6 +487,25 @@ class TestSummarizeByGroups:
         summaries = await metric_repo.summarize_by_campaigns(db_session, [999999999999])
         assert len(summaries) == 0
 
+    async def test_summarize_by_campaigns_sources_defaults_to_all(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, source=MetricSource.user)
+        await make_metric(campaign.id, source=MetricSource.system)
+        summaries = await metric_repo.summarize_by_campaigns(db_session, [campaign.id])
+        assert len(summaries) == 1
+        assert set(summaries[0].sources) == {MetricSource.user, MetricSource.system}
+        assert summaries[0].total_metrics == 2
+
+    async def test_summarize_by_campaigns_filter_by_source(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(campaign.id, spend=20.0, source=MetricSource.system)
+        summaries = await metric_repo.summarize_by_campaigns(db_session, [campaign.id], options=MetricSummaryFilter(source="system"))
+        assert len(summaries) == 1
+        assert summaries[0].sources == [MetricSource.system]
+        assert summaries[0].spend == 20.0
+        assert summaries[0].total_metrics == 1
+
     async def test_summarize_by_clients(self, db_session, existing_metrics_for_campaign_filter):
         # existing_metrics_for_campaign_filter has two clients: Acme (4 metrics) and Other Client (1 metric)
         campaign_ids = existing_metrics_for_campaign_filter["campaign_ids"]
@@ -457,6 +523,16 @@ class TestSummarizeByGroups:
     async def test_summarize_by_clients_empty(self, db_session, existing_metrics_across_campaigns):
         summaries = await metric_repo.summarize_by_clients(db_session, [999999999999])
         assert len(summaries) == 0
+
+    async def test_summarize_by_clients_filter_by_source(self, db_session, make_metric, make_campaign):
+        campaign = await make_campaign()
+        await make_metric(campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(campaign.id, spend=20.0, source=MetricSource.system)
+        summaries = await metric_repo.summarize_by_clients(db_session, [campaign.client_id], options=MetricSummaryFilter(source="user"))
+        assert len(summaries) == 1
+        assert summaries[0].sources == [MetricSource.user]
+        assert summaries[0].spend == 10.0
+        assert summaries[0].total_metrics == 1
 
 
 class TestDeleteMetric:

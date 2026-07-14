@@ -1,4 +1,5 @@
 from app.constants import PAGE_LIMIT_DEFAULT
+from app.models.metric import MetricSource
 from tests.conftest import (
     TEST_METRIC,
     TEST_METRIC_LIST,
@@ -183,6 +184,15 @@ class TestListMetricsForCampaign:
         assert data["total"] == 1
         assert data["items"][0]["campaign_id"] == campaign_id
 
+    async def test_list_metrics_for_campaign_filter_by_source(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, source=MetricSource.user)
+        await make_metric(existing_campaign.id, source=MetricSource.system)
+        response = await client.get(f"/campaigns/{existing_campaign.id}/metrics?source=system")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["source"] == "system"
+
     async def test_list_metrics_for_campaign_only_returns_own_metrics(self, client, existing_metrics_across_campaigns):
         campaign_ids = existing_metrics_across_campaigns["campaign_ids"]
         target_id = campaign_ids[0]
@@ -191,6 +201,17 @@ class TestListMetricsForCampaign:
         items = response.json()["items"]
         assert len(items) == 1
         assert all(item["campaign_id"] == target_id for item in items)
+
+
+class TestListMetricsForClient:
+    async def test_list_metrics_for_client_filter_by_source(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, source=MetricSource.user)
+        await make_metric(existing_campaign.id, source=MetricSource.system)
+        response = await client.get(f"/clients/{existing_campaign.client_id}/metrics?source=system")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total"] == 1
+        assert data["items"][0]["source"] == "system"
 
 
 class TestGetMetric:
@@ -457,6 +478,19 @@ class TestGetMetricsSummaryForCampaigns:
         response = await client.get("/campaigns/metrics/summary")
         assert response.status_code == 422
 
+    async def test_summary_for_campaigns_filter_by_source(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        response = await client.get(f"/campaigns/metrics/summary?ids={existing_campaign.id}&source=system")
+        assert response.status_code == 200
+        summary = response.json()["summaries"][0]
+        assert summary["spend"] == 20.0
+        assert summary["sources"] == ["system"]
+
+    async def test_summary_for_campaigns_filter_by_invalid_source(self, client, existing_campaign):
+        response = await client.get(f"/campaigns/metrics/summary?ids={existing_campaign.id}&source=bogus")
+        assert response.status_code == 422
+
 
 class TestGetMetricsSummaryForClients:
     async def test_summary_for_clients(self, client, existing_metrics_for_campaign_filter):
@@ -478,6 +512,15 @@ class TestGetMetricsSummaryForClients:
     async def test_summary_for_clients_ids_required(self, client):
         response = await client.get("/clients/metrics/summary")
         assert response.status_code == 422
+
+    async def test_summary_for_clients_filter_by_source(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        response = await client.get(f"/clients/metrics/summary?ids={existing_campaign.client_id}&source=user")
+        assert response.status_code == 200
+        summary = response.json()["summaries"][0]
+        assert summary["spend"] == 10.0
+        assert summary["sources"] == ["user"]
 
 
 class TestGetMetricsSummary:
@@ -524,3 +567,23 @@ class TestGetMetricsSummary:
     async def test_summary_filter_by_ids_not_found(self, client, existing_metrics):
         response = await client.get("/metrics/summary?ids=999999999999")
         assert response.status_code == 404
+
+    async def test_summary_filter_by_source(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        response = await client.get("/metrics/summary?source=system")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["spend"] == 20.0
+        assert data["sources"] == ["system"]
+
+    async def test_summary_no_source_filter_returns_all_sources(self, client, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, source=MetricSource.user)
+        await make_metric(existing_campaign.id, source=MetricSource.system)
+        response = await client.get("/metrics/summary")
+        assert response.status_code == 200
+        assert set(response.json()["sources"]) == {"user", "system"}
+
+    async def test_summary_filter_by_invalid_source(self, client):
+        response = await client.get("/metrics/summary?source=bogus")
+        assert response.status_code == 422

@@ -4,6 +4,7 @@ from app.services import metric as metric_service
 from app.exceptions import NotFoundError, DomainValidationError
 from app.schema import MetricCreate, MetricUpdate, PaginatedFilter
 from app.schema.metric import MetricFilter, MetricSummaryFilter
+from app.models.metric import MetricSource
 from tests.conftest import (
     TEST_METRIC_SPEND,
     TEST_METRIC_CLICKS,
@@ -25,7 +26,7 @@ from tests.conftest import (
 class TestCreateMetric:
     async def test_create_metric(self, db_session, existing_campaign):
         data = MetricCreate(spend=TEST_METRIC_SPEND, clicks=TEST_METRIC_CLICKS, impressions=TEST_METRIC_IMPRESSIONS, period_start=PERIOD_START, period_end=PERIOD_END)
-        metric = await metric_service.create(db_session, existing_campaign.id, data)
+        metric = await metric_service.create(db_session, existing_campaign.id, data, "user-key")
         assert metric.id is not None
         assert metric.id > 0
         assert metric.campaign_id == existing_campaign.id
@@ -34,12 +35,23 @@ class TestCreateMetric:
         assert metric.impressions == TEST_METRIC_IMPRESSIONS
         assert metric.period_start == PERIOD_START
         assert metric.period_end == PERIOD_END
+        assert metric.source == MetricSource.user
+
+    async def test_create_metric_with_system_key(self, db_session, existing_campaign):
+        data = MetricCreate(spend=TEST_METRIC_SPEND, clicks=TEST_METRIC_CLICKS, impressions=TEST_METRIC_IMPRESSIONS, period_start=PERIOD_START, period_end=PERIOD_END)
+        metric = await metric_service.create(db_session, existing_campaign.id, data, "test-api-key-system")
+        assert metric.source == MetricSource.system
+
+    async def test_create_metric_with_user_key(self, db_session, existing_campaign):
+        data = MetricCreate(spend=TEST_METRIC_SPEND, clicks=TEST_METRIC_CLICKS, impressions=TEST_METRIC_IMPRESSIONS, period_start=PERIOD_START, period_end=PERIOD_END)
+        metric = await metric_service.create(db_session, existing_campaign.id, data, "user-key")
+        assert metric.source == MetricSource.user
 
     async def test_create_metric_campaign_not_found(self, db_session, existing_campaign):
         fake_id = existing_campaign.id + 1
         data = MetricCreate(spend=TEST_METRIC_SPEND, clicks=TEST_METRIC_CLICKS, impressions=TEST_METRIC_IMPRESSIONS, period_start=PERIOD_START, period_end=PERIOD_END)
         with pytest.raises(NotFoundError) as exc_info:
-            await metric_service.create(db_session, fake_id, data)
+            await metric_service.create(db_session, fake_id, data, "user-key")
         assert "Campaign not found" in exc_info.value.messages
 
 class TestGetMetric:
@@ -178,6 +190,19 @@ class TestListMetricsSummary:
         with pytest.raises(NotFoundError):
             await metric_service.metrics_summary(db_session, ids="999999999999")
 
+    async def test_summary_sources_defaults_to_all(self, db_session, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, source=MetricSource.user)
+        await make_metric(existing_campaign.id, source=MetricSource.system)
+        summary = await metric_service.metrics_summary(db_session)
+        assert set(summary.sources) == {MetricSource.user, MetricSource.system}
+
+    async def test_summary_filter_by_source(self, db_session, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        summary = await metric_service.metrics_summary(db_session, options=MetricSummaryFilter(source="system"))
+        assert summary.spend == 20.0
+        assert summary.sources == [MetricSource.system]
+
 
 class TestMetricsSummaryForCampaigns:
     async def test_summary_for_campaigns(self, db_session, existing_metrics_across_campaigns):
@@ -207,6 +232,14 @@ class TestMetricsSummaryForCampaigns:
         assert len(result.summaries) == 1
         assert result.summaries[0].spend == sum(i * 10 for i in range(5, 13))
 
+    async def test_summary_for_campaigns_filter_by_source(self, db_session, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        result = await metric_service.metrics_summary_for_campaigns(db_session, str(existing_campaign.id), options=MetricSummaryFilter(source="system"))
+        assert len(result.summaries) == 1
+        assert result.summaries[0].spend == 20.0
+        assert result.summaries[0].sources == [MetricSource.system]
+
 
 class TestMetricsSummaryForClients:
     async def test_summary_for_clients(self, db_session, existing_metrics_for_campaign_filter):
@@ -226,6 +259,14 @@ class TestMetricsSummaryForClients:
         fake_id = existing_client.id + 1
         with pytest.raises(NotFoundError):
             await metric_service.metrics_summary_for_clients(db_session, str(fake_id))
+
+    async def test_summary_for_clients_filter_by_source(self, db_session, existing_campaign, make_metric):
+        await make_metric(existing_campaign.id, spend=10.0, source=MetricSource.user)
+        await make_metric(existing_campaign.id, spend=20.0, source=MetricSource.system)
+        result = await metric_service.metrics_summary_for_clients(db_session, str(existing_campaign.client_id), options=MetricSummaryFilter(source="user"))
+        assert len(result.summaries) == 1
+        assert result.summaries[0].spend == 10.0
+        assert result.summaries[0].sources == [MetricSource.user]
 
 
 class TestUpdateMetric:
