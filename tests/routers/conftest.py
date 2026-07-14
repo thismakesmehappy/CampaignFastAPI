@@ -1,5 +1,4 @@
 import os
-os.environ.setdefault("API_KEY", "test-secret")
 
 from typing import Any, AsyncGenerator
 
@@ -21,6 +20,6 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, Any]:
         yield db_session
 
     app.dependency_overrides[get_db] = override_get_db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-Api-Key": "test-secret"}) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test", headers={"X-Api-Key": os.environ["API_KEY"]}) as ac:
         yield ac
     app.dependency_overrides.clear()

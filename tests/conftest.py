@@ -72,8 +72,11 @@ def make_campaign(db_session, make_client):
 @pytest.fixture
 def make_metric(db_session):
     """Factory fixture for creating metrics with custom fields."""
-    async def _make(campaign_id, spend=0.0, clicks=0, impressions=0, period_start=PERIOD_START, period_end=PERIOD_END):
-        return await metric_repo.save(db_session, Metric(spend=spend, clicks=clicks, impressions=impressions, period_start=period_start, period_end=period_end, campaign_id=campaign_id))
+    async def _make(campaign_id, spend=0.0, clicks=0, impressions=0, period_start=PERIOD_START, period_end=PERIOD_END, source=None):
+        kwargs = dict(spend=spend, clicks=clicks, impressions=impressions, period_start=period_start, period_end=period_end, campaign_id=campaign_id)
+        if source is not None:
+            kwargs["source"] = source
+        return await metric_repo.save(db_session, Metric(**kwargs))
 
     return _make
 

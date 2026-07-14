@@ -2,6 +2,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Metric, Client
+from app.models.metric import MetricSource
 from app.schema import MetricBase, PaginatedFilter
 from app.models import Campaign
 from app.schema.metric import MetricFilter, MetricSummaryWithId, MetricSummaryFilter
@@ -59,6 +60,7 @@ def _apply_filters(query, options: MetricSummaryFilter | MetricFilter | None, so
         query = query.where(Metric.impressions >= options.min_impressions)
     if options.max_impressions is not None:
         query = query.where(Metric.impressions <= options.max_impressions)
+    query = query.where(Metric.source.in_(options.source_list))
 
     return apply_sort(
         query,
@@ -126,6 +128,7 @@ async def summarize(db: AsyncSession, options: MetricSummaryFilter | None = None
     return MetricBase(clicks=row.clicks or 0, impressions=row.impressions or 0, spend=row.spend or 0)
 
 async def summarize_by_campaigns(db: AsyncSession, campaign_ids: list[int], options: MetricSummaryFilter = None) -> list[MetricSummaryWithId]:
+    sources = options.source_list if options else list(MetricSource)
     query = (
         select(
             Metric.campaign_id.label("id"),
@@ -139,10 +142,11 @@ async def summarize_by_campaigns(db: AsyncSession, campaign_ids: list[int], opti
     query = _apply_filters(query, options, True)
     query = query.group_by(Metric.campaign_id)
     result = await db.execute(query)
-    return [MetricSummaryWithId.model_validate(row) for row in result.all()]
+    return [MetricSummaryWithId(**row._mapping, sources=sources) for row in result.all()]
 
 
 async def summarize_by_clients(db: AsyncSession, client_ids: list[int], options: MetricSummaryFilter = None) -> list[MetricSummaryWithId]:
+    sources = options.source_list if options else list(MetricSource)
     query = (
         select(
             Campaign.client_id.label("id"),
@@ -157,7 +161,7 @@ async def summarize_by_clients(db: AsyncSession, client_ids: list[int], options:
     query = _apply_filters(query, options, True, joined_campaign=True)
     query = query.group_by(Campaign.client_id)
     result = await db.execute(query)
-    return [MetricSummaryWithId.model_validate(row) for row in result.all()]
+    return [MetricSummaryWithId(**row._mapping, sources=sources) for row in result.all()]
 
 async def delete(db: AsyncSession, metric: Metric) -> None:
     """Delete a metric by id. Returns True if deleted, False if not found."""

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import require_api_key
 from app.database import get_db
 from app.schema import (
     MetricRead,
@@ -21,8 +22,8 @@ router = APIRouter(tags=["metrics"])
 _404 = {404: {"model": ErrorResponse}}
 
 @router.post("/campaigns/{campaign_id}/metrics", response_model=MetricRead, status_code=201, responses=_404)
-async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db)):
-    return await metric_service.create(db, campaign_id, data)
+async def create_metric(campaign_id: int, data: MetricCreate, db: AsyncSession = Depends(get_db), api_key: str = Depends(require_api_key)):
+    return await metric_service.create(db, campaign_id, data, api_key)
 
 @router.get("/campaigns/metrics/summary", response_model=MetricSummaryList, status_code=200, responses=_404)
 async def list_metrics_summary_for_campaigns(ids: str = Query(...), db: AsyncSession = Depends(get_db), options: MetricSummaryFilter = Depends()):

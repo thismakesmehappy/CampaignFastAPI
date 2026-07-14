@@ -1,3 +1,5 @@
+from app.auth import API_KEY_SYSTEM
+from app.models.metric import MetricSource
 from app.repositories import campaign as campaign_repo, metric as metric_repo, client as client_repo
 from app.exceptions import NotFoundError, DomainValidationError
 from app.models import Metric
@@ -16,10 +18,9 @@ from app.schema.metric import (
 )
 
 
-async def create(db, campaign_id: int, data: MetricCreate) -> Metric:
+async def create(db, campaign_id: int, data: MetricCreate, api_key: str) -> Metric:
     # validate_input
     # period order is validated in schema
-
     # fetch
     campaign = await campaign_repo.get(db, campaign_id)
 
@@ -31,6 +32,8 @@ async def create(db, campaign_id: int, data: MetricCreate) -> Metric:
 
     # merge
     metric = Metric(campaign_id=campaign_id, impressions=data.impressions, clicks=data.clicks, spend=data.spend, period_start=data.period_start, period_end=data.period_end)
+    if api_key == API_KEY_SYSTEM:
+        metric.source = MetricSource.system
 
     # persist
     result = await metric_repo.save(db, metric)
@@ -115,7 +118,8 @@ async def metrics_summary(db, ids: str = "", options: MetricSummaryFilter | None
     total = await metric_repo.count(db, options=count_options)
 
     # merge
-    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total)
+    sources = options.source_list if options else list(MetricSource)
+    result = MetricSummary(clicks=aggregates.clicks, impressions=aggregates.impressions, spend=aggregates.spend, total_metrics=total, sources=sources)
 
     # persist
     # return

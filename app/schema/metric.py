@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, field_validator, model_validator
+
+from app.models.metric import MetricSource
+
 
 class MetricBase(BaseModel):
     """Basic data for metric endpoints"""
@@ -13,6 +16,7 @@ class MetricBase(BaseModel):
 class MetricCreate(MetricBase):
     period_start: AwareDatetime
     period_end: AwareDatetime
+    source: MetricSource = MetricSource.user
 
     @model_validator(mode="after")
     def validate_period_star_before_end(self) -> "MetricCreate":
@@ -35,10 +39,12 @@ class MetricRead(MetricCreate):
     id: int
     campaign_id: int
     created_at: datetime
+    source: MetricSource = MetricSource.user
     model_config = {"from_attributes": True}
 
 class MetricSummary(MetricBase):
     total_metrics: int = Field(..., ge=0)
+    sources: list[MetricSource]
 
 class MetricSummaryWithId(MetricSummary):
     id: int = Field(..., ge=0)
@@ -54,10 +60,27 @@ class MetricSummaryFilter(BaseModel):
     max_impressions: int | None = None
     sort_by: str = ""
     desc: str | None = None
+    source: str = ""
+
+    @field_validator("source")
+    @classmethod
+    def validate_source(cls, value: str) -> str:
+        tokens = [s.strip() for s in value.split(",") if s.strip()]
+        invalid = [t for t in tokens if t != "all" and t not in MetricSource._value2member_map_]
+        if invalid:
+            raise ValueError(f"Invalid source(s): {', '.join(invalid)}. Must be 'all' or one of {[s.value for s in MetricSource]}")
+        return value
 
     @property
     def sort_by_list(self) -> list[int] | list[Any]:
         return [i.strip() for i in self.sort_by.split(",")] if self.sort_by else []
+
+    @property
+    def source_list(self) -> list[MetricSource]:
+        tokens = [s.strip() for s in self.source.split(",") if s.strip()]
+        if not tokens or "all" in tokens:
+            return list(MetricSource)
+        return [MetricSource(t) for t in tokens]
 
 class MetricSummaryList(BaseModel):
     resource_type: str = ""

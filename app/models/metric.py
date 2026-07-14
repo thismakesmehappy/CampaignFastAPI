@@ -1,15 +1,22 @@
 from __future__ import annotations
+
+import enum
+from datetime import datetime
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from app.models.campaign import Campaign
-
-from sqlalchemy import DateTime, Float, ForeignKey, BigInteger, func
+from sqlalchemy import BigInteger, DateTime, Enum, Float, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.models.base import Base
 
-from datetime import datetime
+if TYPE_CHECKING:
+    from app.models.campaign import Campaign
+
+
+class MetricSource(str, enum.Enum):
+    user = "user"
+    system = "system"
+
 
 class Metric(Base):
     __tablename__ = "metrics"
@@ -22,6 +29,7 @@ class Metric(Base):
     campaign: Mapped["Campaign"] = relationship(back_populates="metrics")
     period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    source: Mapped[MetricSource] = mapped_column(Enum(MetricSource), default=MetricSource.user, nullable=False)
     
     @validates("campaign_id")
     def validate_campaign_id(self, key, value: int) -> int:
