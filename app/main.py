@@ -7,7 +7,7 @@ from app.auth import require_api_key
 from app.database import engine
 from app.models import Base
 from app.error_handlers import register_error_handlers
-from app.routers import campaigns, metrics, clients, user
+from app.routers import campaigns, metrics, clients, user, demo_seed
 from app.middleware import log_requests
 
 logging.basicConfig(
@@ -40,6 +40,7 @@ app.include_router(campaigns.router, dependencies=[Depends(require_api_key)])
 app.include_router(metrics.router, dependencies=[Depends(require_api_key)])
 app.include_router(clients.router, dependencies=[Depends(require_api_key)])
 app.include_router(user.router, dependencies=[Depends(require_api_key)])
+app.include_router(demo_seed.router, dependencies=[Depends(require_api_key)])
 
 app.middleware("http")(log_requests)
 
