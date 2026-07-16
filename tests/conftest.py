@@ -12,8 +12,10 @@ from app.models.base import Base
 from app.schema import MetricCreate
 from datetime import datetime, timezone
 
-from app.models import Campaign, Metric, Client
+from app.models import Campaign, Metric, Client, User
 from app.repositories import client as client_repo
+from app.repositories import user as user_repo
+from app.services.user import pwd_context
 
 TEST_METRIC_SPEND = 1
 TEST_METRIC_CLICKS = 2
@@ -268,3 +270,41 @@ async def existing_client_list(db_session):
         c = await client_repo.save(db_session, Client(name=name, api_key=api_key))
         clients.append(c)
     return clients
+
+
+VALID_USERNAME = "test_user"
+VALID_PASSWORD = "test-password-123"
+
+USER_LIST_USERNAMES = [
+    "user_one", "user_two", "user_three", "user_four", "user_five",
+    "user_six", "user_seven", "user_eight", "user_nine", "user_ten",
+    "user_eleven", "user_twelve",
+]
+
+LENGTH_OF_USER_RESULTS_DEFAULT = min(len(USER_LIST_USERNAMES), PAGE_LIMIT_DEFAULT)
+
+
+@pytest.fixture
+def make_user(db_session, make_client):
+    """Factory fixture for creating users with custom fields. Creates a client if not provided. Password is hashed via the real pwd_context, same as production."""
+    async def _make(username=VALID_USERNAME, password=VALID_PASSWORD, client_id=None):
+        if client_id is None:
+            c = await make_client()
+            client_id = c.id
+        user = User(username=username, password_hash=pwd_context.hash(password), client_ids=[client_id], is_admin=False)
+        return await user_repo.save(db_session, user)
+    return _make
+
+
+@pytest_asyncio.fixture
+async def existing_user(db_session, make_user, existing_client):
+    return await make_user(client_id=existing_client.id)
+
+
+@pytest_asyncio.fixture
+async def existing_user_list(db_session, make_user, existing_client):
+    users = []
+    for username in USER_LIST_USERNAMES:
+        u = await make_user(username=username, client_id=existing_client.id)
+        users.append(u)
+    return users
